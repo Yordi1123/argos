@@ -191,7 +191,8 @@ sistema no hace**.
 Contenido heredado del diseño que **aún no corresponde al sistema real**. No lo amplíes; al tocarlo, conéctalo
 a datos reales o elimínalo:
 
-- Dashboard: porcentajes de tendencia, sparklines, gráfico de área y "Vehículos supervisados 1,284".
+- Dashboard: porcentajes de tendencia, sparklines, "Vehículos supervisados 1,284", "Tasa de cumplimiento 98.1 %"
+  y las curvas de las pestañas HOY / SEMANA / MES (`CURVAS` en `pages.tsx`).
 - Reportes: los cuatro gráficos de barras y los porcentajes de tendencia de los KPI.
 - Dispositivos: el estado "Activo / Enlace estable" de cada equipo es fijo (no hay telemetría del agente).
   La calibración sí viene de la sesión de captura.

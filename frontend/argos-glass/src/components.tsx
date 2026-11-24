@@ -1,4 +1,4 @@
-import type { ReactNode } from 'react';
+import { useEffect, useRef, useState, type ReactNode } from 'react';
 import { LIMIT, type EventState, type TrafficEvent } from './data';
 import { api } from './api';
 
@@ -98,8 +98,8 @@ export function Sparkline({ color = '#3b82f6', up = true }: { color?: string; up
           <stop offset="100%" stopColor={color} stopOpacity="0" />
         </linearGradient>
       </defs>
-      <path d={`${d} L120 30 L0 30 Z`} fill={`url(#spark-${color})`} />
-      <path d={d} fill="none" stroke={color} strokeWidth="2.2" strokeLinecap="round" />
+      <path className="spark-area" d={`${d} L120 30 L0 30 Z`} fill={`url(#spark-${color})`} />
+      <path className="spark-linea" pathLength={1} d={d} fill="none" stroke={color} strokeWidth="2.2" strokeLinecap="round" />
     </svg>
   );
 }
@@ -218,36 +218,56 @@ export function Camera({ ev, frame, zoom, photoId }: { ev: TrafficEvent; frame: 
   );
 }
 
-/** Gráfico de Doble Curva estilo Dashboard V5 (Flujo vehicular y Velocidades) */
-export function ModernAreaChart() {
-  const points: [string, number, number][] = [
-    ['06:00', 32, 110],
-    ['08:00', 58, 280],
-    ['10:00', 63, 340],
-    ['12:00', 44, 210],
-    ['14:00', 56, 260],
-    ['16:00', 61, 310],
-    ['18:00', 49, 290],
-    ['20:00', 38, 140],
-  ];
+/** Curva suave (Catmull-Rom → Bézier) que pasa por todos los puntos. */
+function curvaSuave(pts: number[][]) {
+  let d = `M ${pts[0][0]},${pts[0][1]}`;
+  for (let i = 0; i < pts.length - 1; i++) {
+    const p0 = pts[i - 1] ?? pts[i], p1 = pts[i], p2 = pts[i + 1], p3 = pts[i + 2] ?? p2;
+    const c1 = [p1[0] + (p2[0] - p0[0]) / 6, p1[1] + (p2[1] - p0[1]) / 6];
+    const c2 = [p2[0] - (p3[0] - p1[0]) / 6, p2[1] - (p3[1] - p1[1]) / 6];
+    d += ` C ${c1[0].toFixed(1)},${c1[1].toFixed(1)} ${c2[0].toFixed(1)},${c2[1].toFixed(1)} ${p2[0]},${p2[1]}`;
+  }
+  return d;
+}
 
-  const w = 680, h = 230, padX = 40, padY = 25;
+const PUNTOS_HOY: [string, number][] = [
+  ['06:00', 32], ['08:00', 58], ['10:00', 63], ['12:00', 44], ['14:00', 56], ['16:00', 61], ['18:00', 49], ['20:00', 38],
+];
+
+/** Velocidad promedio por tramo con el límite como referencia. Se dibuja de izquierda a derecha al montarse. */
+export function ModernAreaChart({ puntos = PUNTOS_HOY, alto = 230, ajustar = false }: { puntos?: [string, number][]; alto?: number; ajustar?: boolean }) {
+  // ajustar: el ancho del dibujo sigue al contenedor y el alto queda fijo (no crece en pantallas anchas)
+  const ref = useRef<SVGSVGElement>(null);
+  const [caja, setCaja] = useState({ w: 680, h: alto });
+  useEffect(() => {
+    const el = ref.current?.parentElement;
+    if (!ajustar || !el) return;
+    const ro = new ResizeObserver(([e]) => setCaja({
+      w: Math.max(320, Math.round(e.contentRect.width)),
+      h: Math.max(alto, Math.round(e.contentRect.height)),
+    }));
+    ro.observe(el);
+    return () => ro.disconnect();
+  }, [ajustar, alto]);
+  const w = ajustar ? caja.w : 680, h = ajustar ? caja.h : alto, padL = 36, padR = 76, padT = 14, padB = 28;
   const maxSpd = 80;
-  const stepX = (w - padX * 2) / (points.length - 1);
+  const stepX = (w - padL - padR) / (puntos.length - 1);
+  const y = (spd: number) => h - padB - (spd / maxSpd) * (h - padT - padB);
+  const limitY = y(LIMIT);
 
-  const getSpdY = (spd: number) => h - padY - (spd / maxSpd) * (h - padY * 2);
-  const limitY = getSpdY(LIMIT);
-
-  const spdCoords = points.map((p, i) => [padX + i * stepX, getSpdY(p[1])]);
-  const spdPath = 'M ' + spdCoords.map((c) => `${c[0]},${c[1]}`).join(' L ');
-  const spdArea = `${spdPath} L ${spdCoords[spdCoords.length - 1][0]},${h - padY} L ${spdCoords[0][0]},${h - padY} Z`;
+  const coords = puntos.map((p, i) => [padL + i * stepX, Number(y(p[1]).toFixed(1))]);
+  const linea = curvaSuave(coords);
+  const area = `${linea} L ${coords[coords.length - 1][0]},${h - padB} L ${coords[0][0]},${h - padB} Z`;
 
   return (
-    <svg className="modern-chart-svg" viewBox={`0 0 ${w} ${h}`} role="img" aria-label="Analítica de flujo y velocidad">
+    <svg
+      ref={ref} className="modern-chart-svg" viewBox={`0 0 ${w} ${h}`} role="img" aria-label="Velocidad promedio frente al límite"
+      style={ajustar ? { position: 'absolute', inset: 0, width: '100%', height: '100%' } : undefined}
+    >
       <defs>
         <linearGradient id="spdGrad" x1="0" y1="0" x2="0" y2="1">
-          <stop offset="0%" stopColor="#3b82f6" stopOpacity="0.45" />
-          <stop offset="60%" stopColor="#3b82f6" stopOpacity="0.1" />
+          <stop offset="0%" stopColor="#3b82f6" stopOpacity="0.42" />
+          <stop offset="65%" stopColor="#3b82f6" stopOpacity="0.08" />
           <stop offset="100%" stopColor="#3b82f6" stopOpacity="0" />
         </linearGradient>
         <linearGradient id="lineGrad" x1="0" y1="0" x2="1" y2="0">
@@ -257,45 +277,38 @@ export function ModernAreaChart() {
         </linearGradient>
       </defs>
 
-      {/* Guías horizontales discretas */}
-      {[20, 40, 60, 80].map((v) => {
-        const y = getSpdY(v);
+      {[0, 20, 40, 60, 80].map((v) => (
+        <g key={v}>
+          <line className="eje-guia" x1={padL} y1={y(v)} x2={w - padR} y2={y(v)} />
+          <text className="eje" x={padL - 10} y={y(v) + 3.5} textAnchor="end">{v}</text>
+        </g>
+      ))}
+
+      <path className="chart-area" d={area} fill="url(#spdGrad)" />
+      <path className="chart-linea" pathLength={1} d={linea} fill="none" stroke="url(#lineGrad)" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" />
+
+      {/* Límite: la etiqueta va en el margen derecho, fuera del área de datos */}
+      <line x1={padL} y1={limitY} x2={w - padR} y2={limitY} stroke="#ef4444" strokeWidth="1.5" strokeDasharray="5 5" opacity="0.9" />
+      <text className="chart-limite" x={w - padR + 10} y={limitY + 4}>Límite {LIMIT}</text>
+
+      {puntos.map((p, i) => {
+        const [cx, cy] = coords[i];
+        const exceso = p[1] > LIMIT;
         return (
-          <g key={v}>
-            <line x1={padX} y1={y} x2={w - padX} y2={y} stroke="rgba(148, 163, 184, 0.15)" strokeDasharray="3 3" />
-            <text x={padX - 8} y={y + 3.5} textAnchor="end" fontSize="10" fill="#94a3b8" fontFamily="inherit">{v}</text>
+          <g key={p[0]} className="chart-punto" style={{ '--i': i } as React.CSSProperties}>
+            <title>{`${p[0]} · ${p[1]} km/h`}</title>
+            <circle cx={cx} cy={cy} r={exceso ? 5.5 : 4.5} fill={exceso ? '#ef4444' : '#3b82f6'} stroke="var(--chart-punto-borde, #fff)" strokeWidth="2" />
           </g>
         );
       })}
 
-      {/* Línea de límite vial */}
-      <line x1={padX} y1={limitY} x2={w - padX} y2={limitY} stroke="#ef4444" strokeWidth="1.5" strokeDasharray="4 4" opacity="0.85" />
-      <text x={w - padX - 4} y={limitY - 8} textAnchor="end" fontSize="10" fill="#ef4444" fontWeight="700">Límite {LIMIT} km/h</text>
-
-      {/* Relleno translúcido de cristal */}
-      <path d={spdArea} fill="url(#spdGrad)" />
-      <path d={spdPath} fill="none" stroke="url(#lineGrad)" strokeWidth="3.2" strokeLinecap="round" strokeLinejoin="round" />
-
-      {/* Puntos destacados con resplandor */}
-      {points.map((p, i) => {
-        const [cx, cy] = spdCoords[i];
-        const isExcess = p[1] > LIMIT;
-        return (
-          <g key={i}>
-            <circle cx={cx} cy={cy} r={isExcess ? 5.5 : 4} fill={isExcess ? '#ef4444' : '#3b82f6'} stroke="#ffffff" strokeWidth="2" />
-          </g>
-        );
-      })}
-
-      {/* Etiquetas Eje X */}
-      {points.map((p, i) => (
-        <text key={p[0]} x={padX + i * stepX} y={h - 6} textAnchor="middle" fontSize="10.5" fill="#94a3b8" fontFamily="inherit">{p[0]}</text>
+      {puntos.map((p, i) => (
+        <text key={p[0]} className="eje" x={padL + i * stepX} y={h - 8} textAnchor="middle">{p[0]}</text>
       ))}
     </svg>
   );
 }
 
-/** Velocímetro estilo Glasssy Dashboard V5 */
 export function Gauge({ speed = 58, limit = LIMIT, valor }: { speed?: number; limit?: number; valor?: ReactNode }) {
   const max = Math.max(80, limit * 2);
   const k = Math.min(1, Math.max(0, speed / max));
@@ -401,7 +414,7 @@ export function EventTable({
                 {onSort && <span className="sort-indicator">↕</span>}
               </div>
             </th>
-            <th><div className="th-cell">Límite</div></th>
+            {full && <th><div className="th-cell">Límite</div></th>}
             {full && <th><div className="th-cell">Exceso</div></th>}
             <th><div className="th-cell"><Icon name="camera" /> Placa Registrada</div></th>
             <th><div className="th-cell"><Icon name="sparkle" /> Confianza AI</div></th>
@@ -446,9 +459,11 @@ export function EventTable({
                     <span className="speed-unit">km/h</span>
                   </div>
                 </td>
-                <td>
-                  <span className="limit-tag">{e.limit} km/h</span>
-                </td>
+                {full && (
+                  <td>
+                    <span className="limit-tag">{e.limit} km/h</span>
+                  </td>
+                )}
                 {full && (
                   <td>
                     <span className="excess-delta-tag">+{(e.speed - e.limit).toFixed(1)} km/h</span>

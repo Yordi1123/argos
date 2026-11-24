@@ -161,3 +161,193 @@
 .gauge-box.over .gauge-dial::before { background: radial-gradient(closest-side at 50% 78%, rgba(239, 68, 68, 0.22), rgba(239, 68, 68, 0)); }
 .gauge-dial > svg, .gauge-dial > .g-center { position: relative; z-index: 1; }
 .gauge-dial > .g-center { position: absolute; }
+
+/* ==========================================================================
+   Dashboard: contraste, composición y entrada (una sola vez, sin rebote)
+   ========================================================================== */
+
+/* --- Contraste en modo oscuro (los tonos base de index.css están pensados para fondo claro) --- */
+.v5-panel:not([data-theme='light']) .badge-pill.valid { color: #6ee7b7; background: rgba(16, 185, 129, 0.16); }
+.v5-panel:not([data-theme='light']) .badge-pill.valid .b-dot { background: #34d399; }
+.v5-panel:not([data-theme='light']) .badge-pill.pending { color: #fcd34d; background: rgba(245, 158, 11, 0.16); }
+.v5-panel:not([data-theme='light']) .badge-pill.pending .b-dot { background: #fbbf24; }
+.v5-panel:not([data-theme='light']) .badge-pill.alert { color: #fca5a5; background: rgba(239, 68, 68, 0.16); }
+.v5-panel:not([data-theme='light']) .badge-pill.alert .b-dot { background: #f87171; }
+.v5-panel:not([data-theme='light']) .badge-pill.discard { color: #cbd5e1; }
+.v5-panel:not([data-theme='light']) .trend-pill.up { color: #6ee7b7; }
+.v5-panel:not([data-theme='light']) .trend-pill.down { color: #fca5a5; }
+
+.v5-panel:not([data-theme='light']) .kpi-icon-wrap.icon-blue { background: rgba(59, 130, 246, 0.2); color: #93c5fd; }
+.v5-panel:not([data-theme='light']) .kpi-icon-wrap.icon-red { background: rgba(239, 68, 68, 0.2); color: #fca5a5; }
+.v5-panel:not([data-theme='light']) .kpi-icon-wrap.icon-amber { background: rgba(245, 158, 11, 0.2); color: #fcd34d; }
+.v5-panel:not([data-theme='light']) .kpi-icon-wrap.icon-emerald { background: rgba(16, 185, 129, 0.2); color: #6ee7b7; }
+.kpi-icon-wrap { border: 1px solid rgba(255, 255, 255, 0.08); }
+.kpi-icon-wrap .icon-svg { stroke: currentColor; }
+
+.v5-panel:not([data-theme='light']) .tab-btn.active { background: rgba(59, 130, 246, 0.24); color: #dbeafe; box-shadow: inset 0 0 0 1px rgba(147, 197, 253, 0.3); }
+.v5-panel[data-theme='light'] .tab-btn.active { background: #fff; color: var(--accent); }
+.tab-btn { transition: background-color 0.18s ease-out, color 0.18s ease-out; }
+
+/* --- KPI: jerarquía --- */
+.v5-kpi-card .kpi-value { font-variant-numeric: tabular-nums; line-height: 1.05; }
+.v5-kpi-card .kpi-title { letter-spacing: 0.01em; }
+
+/* --- Gráfico: ocupa toda su tarjeta, ejes legibles --- */
+.v5-chart-card { display: flex; flex-direction: column; }
+.dash-chart-area { flex: 1; display: flex; align-items: center; min-height: 0; }
+.modern-chart-svg { height: auto; }
+.dash-chart-area .modern-chart-svg { width: 100%; }
+.modern-chart-svg .eje { fill: var(--text-muted); font-size: 11px; font-family: inherit; font-weight: 600; }
+.modern-chart-svg .eje-guia { stroke: var(--divider); stroke-width: 1; stroke-dasharray: 3 4; }
+.modern-chart-svg .chart-limite { fill: #ef4444; font-size: 11px; font-weight: 800; font-family: inherit; }
+.v5-panel:not([data-theme='light']) .modern-chart-svg .chart-limite { fill: #f87171; }
+.v5-panel:not([data-theme='light']) .modern-chart-svg { --chart-punto-borde: #0b1630; }
+.chart-stat-chips .stat-chip b { font-variant-numeric: tabular-nums; }
+
+/* --- Donut: centro opaco y separadores finos --- */
+.v5-donut-card .glass-donut { width: 156px; height: 156px; }
+.donut-anillo { position: absolute; inset: 0; border-radius: 50%; }
+.v5-donut-card .donut-inner { inset: 20px; backdrop-filter: none; }
+.v5-panel:not([data-theme='light']) .v5-donut-card .donut-inner {
+  background: #0c1830; box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.06), 0 6px 18px rgba(0, 0, 0, 0.35);
+}
+.v5-panel[data-theme='light'] .v5-donut-card .donut-inner { background: #fff; box-shadow: 0 4px 14px rgba(15, 23, 42, 0.1); }
+.v5-donut-card .donut-count { font-variant-numeric: tabular-nums; line-height: 1; }
+
+.v5-donut-card .stat-row-left { width: 132px; flex-shrink: 0; }
+.v5-donut-card .stat-row-left .badge-pill { white-space: nowrap; }
+.v5-donut-card .stat-count { min-width: 22px; text-align: right; font-variant-numeric: tabular-nums; }
+.v5-panel:not([data-theme='light']) .stat-progress-bar { background: rgba(148, 163, 184, 0.14); }
+
+/* --- Entrada --- */
+@property --barrido {
+  syntax: '<angle>';
+  inherits: false;
+  initial-value: 360deg;
+}
+@keyframes dash-barrido { from { --barrido: 0deg; } to { --barrido: 360deg; } }
+@keyframes dash-trazo { from { stroke-dashoffset: 1; } to { stroke-dashoffset: 0; } }
+@keyframes dash-aparecer { from { opacity: 0; } to { opacity: 1; } }
+@keyframes dash-subir { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: none; } }
+@keyframes dash-llenar { from { width: 0; } }
+
+.dash-cascada > * { animation: dash-subir 0.32s ease-out both; }
+.dash-cascada > :nth-child(2) { animation-delay: 60ms; }
+.dash-cascada > :nth-child(3) { animation-delay: 120ms; }
+.dash-cascada > :nth-child(4) { animation-delay: 180ms; }
+.dash-fila-2 > :nth-child(1) { animation-delay: 220ms; }
+.dash-fila-2 > :nth-child(2) { animation-delay: 280ms; }
+.dash-entrada-tabla { animation: dash-subir 0.32s ease-out 340ms both; }
+
+/* Sparklines y curva: se dibujan de izquierda a derecha */
+.spark-linea { stroke-dasharray: 1; animation: dash-trazo 0.9s cubic-bezier(0.22, 1, 0.36, 1) 0.25s both; }
+.spark-area { animation: dash-aparecer 0.6s ease-out 0.6s both; }
+.chart-linea { stroke-dasharray: 1; animation: dash-trazo 1s cubic-bezier(0.22, 1, 0.36, 1) 0.15s both; }
+.chart-area { animation: dash-aparecer 0.6s ease-out 0.55s both; }
+.chart-punto { animation: dash-aparecer 0.25s ease-out both; animation-delay: calc(0.3s + var(--i, 0) * 90ms); }
+
+/* Donut: se completa en barrido; barras de estado: se llenan */
+.v5-donut-card .donut-anillo {
+  -webkit-mask: conic-gradient(#000 var(--barrido), transparent 0);
+  mask: conic-gradient(#000 var(--barrido), transparent 0);
+  animation: dash-barrido 1s cubic-bezier(0.22, 1, 0.36, 1) 0.35s both;
+}
+.v5-donut-card .donut-inner { animation: dash-aparecer 0.4s ease-out 0.3s both; }
+.v5-donut-card .stat-progress-bar span { animation: dash-llenar 0.8s cubic-bezier(0.22, 1, 0.36, 1) 0.5s both; }
+.v5-panel[data-theme='light'] .kpi-icon-wrap { box-shadow: none; border-color: rgba(15, 23, 42, 0.06); }
+.v5-panel[data-theme='light'] .kpi-icon-wrap.icon-blue { background: rgba(37, 99, 235, 0.12); color: #1d4ed8; }
+.v5-panel[data-theme='light'] .kpi-icon-wrap.icon-red { background: rgba(220, 38, 38, 0.11); color: #b91c1c; }
+.v5-panel[data-theme='light'] .kpi-icon-wrap.icon-amber { background: rgba(217, 119, 6, 0.13); color: #b45309; }
+.v5-panel[data-theme='light'] .kpi-icon-wrap.icon-emerald { background: rgba(5, 150, 105, 0.12); color: #047857; }
+
+/* ==========================================================================
+   Dashboard compacto: cabe en una laptop (1366×768 / 1536×864) con poco o ningún desplazamiento.
+   Todo bajo .dash para no alterar otras páginas que reutilizan estas tarjetas.
+   ========================================================================== */
+.dash .dash-heading { margin-bottom: 16px; }
+.dash .dash-heading h1 { font-size: 28px; margin: 2px 0 2px; }
+.dash .dash-heading .subtitle { font-size: 13.5px; }
+.dash .dash-heading .glass-btn, .dash .dash-heading .primary-glass-btn { padding-top: 9px; padding-bottom: 9px; }
+
+/* KPI: ícono a la izquierda, número grande, sparkline abajo a la derecha */
+.dash .v5-kpi-grid { gap: 16px; margin-bottom: 16px; }
+.dash .dash-kpi {
+  position: relative; display: grid; grid-template-columns: auto 1fr; align-items: start; gap: 12px;
+  padding: 14px 16px 12px; min-height: 0;
+}
+.dash .dash-kpi .kpi-icon-wrap { width: 38px; height: 38px; border-radius: 11px; }
+.dash .dash-kpi .kpi-icon-wrap svg { width: 19px; height: 19px; }
+.dash-kpi-cuerpo { display: flex; flex-direction: column; min-width: 0; position: relative; z-index: 1; }
+.dash .dash-kpi .kpi-title { font-size: 12px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.dash-kpi-valor { display: flex; align-items: center; gap: 8px; margin: 3px 0 1px; }
+.dash .dash-kpi .trend-pill { padding: 2px 7px; font-size: 10.5px; flex-shrink: 0; }
+.dash .dash-kpi .kpi-value { font-size: 28px; margin: 0; }
+/* El subtítulo no cabe junto a la sparkline: queda como tooltip de la tarjeta */
+.dash .dash-kpi .kpi-sub { display: none; }
+.dash .dash-kpi-spark {
+  position: absolute; right: 14px; bottom: 10px; width: 34%; height: 24px; margin: 0; opacity: 0.95;
+}
+
+/* Gráfico y donut */
+.dash .v5-analytics-grid { gap: 16px; margin-bottom: 16px; }
+.dash .v5-chart-card, .dash .v5-donut-card { padding: 18px 20px; }
+.dash .chart-card-header { margin-bottom: 10px; }
+.dash .chart-card-header h2, .dash .card-top-row h2 { font-size: 17px; }
+.dash-leyenda { display: inline-flex; align-items: center; gap: 6px; flex-wrap: wrap; }
+.dash-leyenda .legend-dot { width: 8px; height: 8px; }
+.dash-leyenda { column-gap: 14px; row-gap: 2px; }
+.dash-leyenda > span { display: inline-flex; align-items: center; gap: 6px; white-space: nowrap; }
+@media (max-width: 600px) {
+  .dash .chart-card-header { flex-direction: column; align-items: flex-start; gap: 10px; }
+}
+.dash .chart-stat-chips { gap: 10px; margin-bottom: 6px; }
+.dash .stat-chip { padding: 5px 12px; }
+.dash .dash-chart-area { display: block; position: relative; flex: 1; min-height: 190px; }
+
+/* Donut a la izquierda y lista de estados a la derecha */
+.dash-donut-cuerpo { flex: 1; display: flex; align-items: center; gap: 16px; margin-top: 10px; }
+.dash .v5-donut-card { display: flex; flex-direction: column; }
+.dash .dash-donut-cuerpo .donut-wrap { padding: 0; flex-shrink: 0; }
+.dash .dash-donut-cuerpo .donut-stats-list { flex: 1; min-width: 0; }
+.dash .v5-donut-card .stat-row-left { width: auto; min-width: 0; flex: 0 1 auto; }
+.dash .v5-donut-card .stat-progress-bar { min-width: 24px; }
+.dash .v5-donut-card .glass-donut { width: 112px; height: 112px; }
+.dash .v5-donut-card .donut-inner { inset: 15px; }
+.dash .v5-donut-card .donut-count { font-size: 24px; }
+.dash .v5-donut-card .donut-label { font-size: 10px; }
+.dash .donut-stats-list { gap: 5px; margin-top: 2px; }
+.dash .stat-row { padding: 3px 8px; gap: 8px; }
+.dash .stat-row .badge-pill { font-size: 11px; }
+.dash .stat-row .badge-pill { padding-top: 3px; padding-bottom: 3px; }
+
+/* Tabla: filas más bajas */
+.dash .v5-table-card { padding: 16px 20px; margin-bottom: 8px; }
+.dash .table-card-header { margin-bottom: 12px; }
+.dash .glass-table th { padding: 10px 14px; }
+.dash .glass-table td { padding: 8px 14px; }
+
+/* Pantallas altas (Full HD): un poco más de aire */
+@media (min-height: 900px) {
+  .dash .dash-heading { margin-bottom: 20px; }
+  .dash .v5-kpi-grid, .dash .v5-analytics-grid { margin-bottom: 20px; }
+}
+
+/* Donut estrecho (laptops de 1366 px): sin barras, el número basta */
+.dash .v5-donut-card { container-type: inline-size; }
+@container (max-width: 400px) {
+  .dash .v5-donut-card .stat-progress-bar { display: none; }
+  .dash .v5-donut-card .stat-row { justify-content: space-between; }
+}
+
+/* Tabla del dashboard: placa y celdas más bajas */
+.dash .glass-table td { padding-top: 6px; padding-bottom: 6px; }
+.dash .glass-table .plate-badge { padding: 2px 10px 2px; min-width: 88px; border-width: 1.5px; }
+.dash .glass-table .plate-num { font-size: 13px; letter-spacing: 1.8px; }
+.dash .glass-table .peru-tag { font-size: 7.5px; }
+.dash .glass-table .event-icon { width: 30px; height: 30px; border-radius: 9px; }
+
+/* KPI estrecho: la sparkline no pisa la tendencia */
+.dash .dash-kpi { container-type: inline-size; }
+@container (max-width: 270px) {
+  .dash .dash-kpi-spark { display: none; }
+}

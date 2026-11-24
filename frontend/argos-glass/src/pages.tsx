@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from 'react';
 import { LIMIT, STATES, type EventState, type Page, type TrafficEvent } from './data';
 import { api, puede, REVISABLES, type Auditoria, type EventoDetalle, type Sesion, type SesionCaptura } from './api';
 import { cuandoFue, resumenParaRol, tituloSaludo } from './saludo';
+import { useCountUp } from './hooks';
 import { AuditTimeline, Badge, Bars, Camera, EventTable, Gauge, Glass, Heading, Icon, ModernAreaChart, PlateTag, Road, Sparkline, TrendPill } from './components';
 import { PanelVision } from './vision';
 import { CamaraEnVivo, HistorialLecturas } from './monitor';
@@ -66,6 +67,19 @@ function auditIcon(a: Auditoria) {
 }
 
 /* ---------------- Dashboard V5 Style ---------------- */
+/* Curvas de ejemplo de las pestañas del gráfico (deuda conocida: aún no hay aforo real por franja). */
+const CURVAS: Record<'hoy' | 'semana' | 'mes', [string, number][]> = {
+  hoy: [['06:00', 32], ['08:00', 58], ['10:00', 63], ['12:00', 44], ['14:00', 56], ['16:00', 61], ['18:00', 49], ['20:00', 38]],
+  semana: [['Lun', 46], ['Mar', 52], ['Mié', 49], ['Jue', 55], ['Vie', 58], ['Sáb', 61], ['Dom', 44]],
+  mes: [['Sem 1', 48], ['Sem 2', 53], ['Sem 3', 51], ['Sem 4', 56]],
+};
+
+/** Número de KPI que cuenta desde 0 al entrar al dashboard. */
+function KpiValor({ valor }: { valor: number }) {
+  const texto = useCountUp(valor, 900, 0);
+  return <strong className="kpi-value">{texto}</strong>;
+}
+
 export function Dashboard({ c }: { c: Ctx }) {
   const v = count(c.events, 'Validado'), p = count(c.events, 'Pendiente'), total = c.events.length;
   const denom = total || 1;
@@ -76,14 +90,14 @@ export function Dashboard({ c }: { c: Ctx }) {
   const [primerosPasosVisto, setPrimerosPasosVisto] = useState(false);
 
   const kpis = [
-    { title: 'Vehículos Supervisados', val: '1,284', sub: 'Aforo diario registrado', trend: '+14.2%', up: true, icon: 'car', page: 'monitor' as Page, color: '#3b82f6', hex: 'blue' },
-    { title: 'Infracciones Detectadas', val: String(total), sub: 'Eventos registrados por el sistema', trend: '-2.4%', up: false, icon: 'speedometer', page: 'events' as Page, color: '#ef4444', hex: 'red' },
-    { title: 'Pendientes de Revisión', val: String(p), sub: 'Requieren arbitraje pericial', trend: '+5.0%', up: true, icon: 'shield', page: 'review' as Page, color: '#f59e0b', hex: 'amber' },
-    { title: 'Evidencias Validadas', val: String(v), sub: 'Dictámenes concluidos', trend: '+18.6%', up: true, icon: 'check', page: 'reports' as Page, color: '#10b981', hex: 'emerald' },
+    { title: 'Vehículos Supervisados', val: 1284, sub: 'Aforo diario registrado', trend: '+14.2%', up: true, icon: 'car', page: 'monitor' as Page, color: '#3b82f6', hex: 'blue' },
+    { title: 'Infracciones Detectadas', val: total, sub: 'Eventos registrados por el sistema', trend: '-2.4%', up: false, icon: 'speedometer', page: 'events' as Page, color: '#ef4444', hex: 'red' },
+    { title: 'Pendientes de Revisión', val: p, sub: 'Requieren arbitraje pericial', trend: '+5.0%', up: true, icon: 'shield', page: 'review' as Page, color: '#f59e0b', hex: 'amber' },
+    { title: 'Evidencias Validadas', val: v, sub: 'Dictámenes concluidos', trend: '+18.6%', up: true, icon: 'check', page: 'reports' as Page, color: '#10b981', hex: 'emerald' },
   ];
 
   return (
-    <>
+    <div className="dash">
       <Heading
         title={tituloSaludo(c.user)}
         sub={
@@ -121,21 +135,21 @@ export function Dashboard({ c }: { c: Ctx }) {
       )}
 
       {/* Fila de 4 KPI Cards estilo Glasssy V5 con Sparklines */}
-      <div className="v5-kpi-grid">
+      <div className="v5-kpi-grid dash-cascada">
         {kpis.map((k) => (
-          <Glass key={k.title} className="v5-kpi-card" onClick={() => c.go(k.page)}>
-            <div className="kpi-header">
-              <div className={`kpi-icon-wrap icon-${k.hex}`}>
-                <Icon name={k.icon} />
-              </div>
-              <TrendPill value={k.trend} up={k.up} />
+          <Glass key={k.title} className="v5-kpi-card dash-kpi" title={k.sub} onClick={() => c.go(k.page)}>
+            <div className={`kpi-icon-wrap icon-${k.hex}`}>
+              <Icon name={k.icon} />
             </div>
-            <div className="kpi-body">
+            <div className="dash-kpi-cuerpo">
               <span className="kpi-title">{k.title}</span>
-              <strong className="kpi-value">{k.val}</strong>
+              <div className="dash-kpi-valor">
+                <KpiValor valor={k.val} />
+                <TrendPill value={k.trend} up={k.up} />
+              </div>
               <small className="kpi-sub">{k.sub}</small>
             </div>
-            <div className="kpi-sparkline-box">
+            <div className="kpi-sparkline-box dash-kpi-spark">
               <Sparkline color={k.color} up={k.up} />
             </div>
           </Glass>
@@ -143,18 +157,22 @@ export function Dashboard({ c }: { c: Ctx }) {
       </div>
 
       {/* Grid Principal: Gráfico Analítico V5 + Donut de Distribución */}
-      <div className="v5-analytics-grid">
+      <div className="v5-analytics-grid dash-cascada dash-fila-2">
         <Glass className="v5-chart-card">
           <div className="chart-card-header">
             <div>
               <h2>Analítica de Tránsito y Velocidades</h2>
-              <small className="muted">Monitoreo continuo en Av. Pacífico · UPIS Belén</small>
+              <small className="muted dash-leyenda">
+                <span><span className="legend-dot blue" /> Velocidad promedio (km/h)</span>
+                <span><span className="legend-dot red" /> Límite {LIMIT} km/h</span>
+              </small>
             </div>
             <div className="chart-tabs">
               {(['hoy', 'semana', 'mes'] as const).map((t) => (
                 <button
                   key={t}
                   className={`tab-btn ${chartTab === t ? 'active' : ''}`}
+                  aria-pressed={chartTab === t}
                   onClick={() => setChartTab(t)}
                 >
                   {t.toUpperCase()}
@@ -178,17 +196,8 @@ export function Dashboard({ c }: { c: Ctx }) {
             </div>
           </div>
 
-          <ModernAreaChart />
-
-          <div className="chart-legend-v5">
-            <div className="legend-item">
-              <span className="legend-dot blue" />
-              <span>Velocidad promedio registrada (km/h)</span>
-            </div>
-            <div className="legend-item">
-              <span className="legend-dot red" />
-              <span>Umbral infractor (Límite {LIMIT} km/h)</span>
-            </div>
+          <div className="dash-chart-area">
+            <ModernAreaChart key={chartTab} puntos={CURVAS[chartTab]} alto={190} ajustar />
           </div>
         </Glass>
 
@@ -198,15 +207,17 @@ export function Dashboard({ c }: { c: Ctx }) {
             <h2>Resolución Pericial</h2>
             <span className="tag-pill">{total} Eventos</span>
           </div>
-          <small className="muted">Estado de evidencias del día de hoy</small>
+          <small className="muted">Estado de todos los eventos registrados</small>
 
+          <div className="dash-donut-cuerpo">
           <div className="donut-wrap">
-            <div
-              className="glass-donut"
-              style={{
-                background: `conic-gradient(#10b981 0 ${v / denom * 100}%, #f59e0b 0 ${(v + p) / denom * 100}%, #94a3b8 0 ${(v + p + nv) / denom * 100}%, #3b82f6 0)`,
-              }}
-            >
+            <div className="glass-donut">
+              <div
+                className="donut-anillo"
+                style={{
+                  background: `conic-gradient(#10b981 0 ${v / denom * 100}%, #f59e0b 0 ${(v + p) / denom * 100}%, #94a3b8 0 ${(v + p + nv) / denom * 100}%, #3b82f6 0)`,
+                }}
+              />
               <div className="donut-inner">
                 <span className="donut-count">{total}</span>
                 <span className="donut-label">Total</span>
@@ -236,11 +247,12 @@ export function Dashboard({ c }: { c: Ctx }) {
               );
             })}
           </div>
+          </div>
         </Glass>
       </div>
 
       {/* Fila Inferior: Tabla Glasssy V5 */}
-      <Glass className="v5-table-card">
+      <Glass className="v5-table-card dash-entrada-tabla">
         <div className="table-card-header">
           <div>
             <h2>Actividad Reciente en Vía</h2>
@@ -252,7 +264,7 @@ export function Dashboard({ c }: { c: Ctx }) {
         </div>
         <EventTable list={c.events.slice(0, 5)} onOpen={c.open} onSort={c.sortSpeed} />
       </Glass>
-    </>
+    </div>
   );
 }
 
@@ -901,7 +913,7 @@ export function Reports({ c }: { c: Ctx }) {
         </Glass>
         <Glass>
           <h2>Curva Horaria de Infracciones</h2>
-          <ModernAreaChart />
+          <ModernAreaChart alto={300} />
         </Glass>
         <Glass>
           <h2>Franjas Horarias Críticas</h2>
