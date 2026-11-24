@@ -1,0 +1,16 @@
+# Secretos
+.env
+
+# Evidencias y respaldos (datos personales: nunca a git)
+data/evidencias/*
+!data/evidencias/.gitkeep
+respaldos/
+
+# Python
+__pycache__/
+*.pyc
+.venv/
+
+# Node
+node_modules/
+dist/

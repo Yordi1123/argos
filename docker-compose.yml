@@ -46,10 +46,15 @@ services:
         condition: service_healthy
 
   frontend:
-    build: ./frontend
+    build: ./frontend/argos-glass
     restart: unless-stopped
     ports:
       - "${PANEL_HOST:-127.0.0.1}:${PANEL_PUERTO:-8080}:80"
+    healthcheck:
+      test: ["CMD", "wget", "-q", "--spider", "http://127.0.0.1/"]
+      interval: 10s
+      timeout: 3s
+      retries: 5
     depends_on:
       backend:
         condition: service_healthy
