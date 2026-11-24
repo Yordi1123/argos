@@ -1,6 +1,6 @@
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { LIMIT, STATES, type EventState, type Page, type TrafficEvent } from './data';
-import { puede, REVISABLES, type Auditoria, type EventoDetalle, type Sesion } from './api';
+import { api, puede, REVISABLES, type Auditoria, type EventoDetalle, type Sesion, type SesionCaptura } from './api';
 import { cuandoFue, resumenParaRol, tituloSaludo } from './saludo';
 import { AuditTimeline, Badge, Bars, Camera, EventTable, Gauge, Glass, Heading, Icon, ModernAreaChart, PlateTag, Road, Sparkline, TrendPill } from './components';
 import { PanelVision } from './vision';
@@ -782,8 +782,8 @@ export function Detail({ c, review }: { c: Ctx; review: boolean }) {
 
           <Glass style={{ marginTop: 20 }}>
             <div className="card-top-row">
-              <h2>Cadena de Custodia Criptográfica</h2>
-              <span className="badge-pill valid"><span className="b-dot" />Certificada</span>
+              <h2>Cadena de Custodia</h2>
+              <span className="badge-pill valid"><span className="b-dot" />Inalterable</span>
             </div>
             {d ? (
               <AuditTimeline
@@ -872,7 +872,7 @@ export function Reports({ c }: { c: Ctx }) {
           { title: 'Velocidad Promedio', val: `${avg} km/h`, sub: 'Promedio general del aforo', trend: '+1.2%', up: true, color: '#3b82f6', hex: 'blue' },
           { title: 'Velocidad Máxima', val: `${max} km/h`, sub: 'Pico en Av. Pacífico', trend: '+5.4%', up: true, color: '#ef4444', hex: 'red' },
           { title: 'Revisiones Completadas', val: `${c.events.filter((e) => e.state === 'Validado' || e.state === 'Descartado').length}/${c.events.length}`, sub: 'Tasa de resolución', trend: '+22.5%', up: true, color: '#10b981', hex: 'emerald' },
-          { title: 'Conformidad Legal', val: '100%', sub: 'D.S. N° 025-2021-MTC', trend: 'Optimo', up: true, color: '#8b5cf6', hex: 'purple' },
+          { title: 'Placas Leídas por IA', val: `${c.events.length ? Math.round((c.events.filter((e) => e.originalPlate !== '???-???').length / c.events.length) * 100) : 0}%`, sub: 'Eventos con placa candidata', trend: 'YOLOv11s', up: true, color: '#8b5cf6', hex: 'purple' },
         ].map((x) => (
           <Glass key={x.title} className="v5-kpi-card">
             <div className="kpi-header">
@@ -912,21 +912,35 @@ export function Reports({ c }: { c: Ctx }) {
   );
 }
 
+/** Sesión de captura más reciente (la abierta si existe): su calibración es la que usa el backend. */
+function useSesionCaptura() {
+  const [s, setS] = useState<SesionCaptura | null>(null);
+  useEffect(() => {
+    let vivo = true;
+    api.sesionesCaptura()
+      .then((l) => { if (vivo) setS(l.find((x) => !x.cerrada_en) ?? l[0] ?? null); })
+      .catch(() => { /* sin sesiones: se muestran guiones */ });
+    return () => { vivo = false; };
+  }, []);
+  return s;
+}
+const fechaCorta = (iso: string) => new Date(iso).toLocaleString('es-PE', { timeZone: 'America/Lima', day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit', hour12: false });
+
 /* ---------------- Dispositivos ---------------- */
-export function Devices({ c }: { c: Ctx }) {
+export function Devices() {
+  const s = useSesionCaptura();
   const devs = [
-    { name: 'Microcontrolador ESP32', port: 'COM3 / UART 115200', fw: 'v1.4.2-Edge', lat: '1.2 ms', icon: 'cpu', status: 'Excelente', ip: '192.168.1.104', uptime: '99.98%' },
-    { name: 'Sensor Fotoeléctrico 1', port: 'Barrera A (Inicio)', fw: 'Haz Infrarrojo', lat: '0.4 ms', icon: 'monitor', status: 'Activo', ip: 'GPIO-18 (PULL-UP)', uptime: '100%' },
-    { name: 'Sensor Fotoeléctrico 2', port: 'Barrera B (Fin)', fw: 'Haz Infrarrojo', lat: '0.4 ms', icon: 'monitor', status: 'Activo', ip: 'GPIO-19 (PULL-UP)', uptime: '100%' },
-    { name: 'Cámara IP CAM-01', port: '1920x1080 @ 30 FPS', fw: '50mm F/1.8 HDR', lat: '12 ms', icon: 'camera', status: '1080p OK', ip: 'rtsp://192.168.1.50', uptime: '99.94%' },
+    { name: 'Microcontrolador ESP32', icon: 'cpu', status: 'Activo', enlace: 'USB', res: '1 µs', funcion: 'Tiempos t1 · t2', conexion: 'Laptop' },
+    { name: 'Barrera Fotoeléctrica 1', icon: 'monitor', status: 'Activo', enlace: 'GPIO', res: '1 µs', funcion: 'Inicio (t1)', conexion: 'ESP32' },
+    { name: 'Barrera Fotoeléctrica 2', icon: 'monitor', status: 'Activo', enlace: 'GPIO', res: '1 µs', funcion: 'Fin (t2)', conexion: 'ESP32' },
+    { name: 'Cámara IP CAM-01', icon: 'camera', status: '1080p', enlace: 'RTSP', res: '1080p', funcion: 'Foto del vehículo', conexion: 'Laptop' },
   ];
 
   return (
     <>
       <Heading
-        title="Supervisión de Dispositivos y Telemetría"
-        sub="Estado operativo de la cadena de medición física y captura fotográfica en tiempo real."
-        actions={<button className="primary-glass-btn" onClick={() => c.toast('Diagnóstico: 4 nodos hardware sincronizados sin pérdidas de tramas.')}>↻ Test de Diagnóstico</button>}
+        title="Supervisión de Dispositivos"
+        sub="Cadena de medición del punto de control: barreras, microcontrolador y cámara."
       />
 
       <div className="v5-devices-grid">
@@ -940,22 +954,21 @@ export function Devices({ c }: { c: Ctx }) {
             </div>
 
             <h2 className="device-title">{d.name}</h2>
-            
+
             <div className="device-metrics-strip">
               <div className="metric-chip">
-                <small>Latencia</small>
-                <b className="tick">{d.lat}</b>
+                <small>Enlace</small>
+                <b className="tick">{d.enlace}</b>
               </div>
               <div className="metric-chip">
-                <small>Uptime</small>
-                <b>{d.uptime}</b>
+                <small>Resolución</small>
+                <b>{d.res}</b>
               </div>
             </div>
 
             <div className="device-meta-list">
-              <div className="device-meta-row"><span>Dirección:</span><b>{d.ip}</b></div>
-              <div className="device-meta-row"><span>Interfaz:</span><b>{d.port}</b></div>
-              <div className="device-meta-row"><span>Firmware:</span><b>{d.fw}</b></div>
+              <div className="device-meta-row"><span>Función:</span><b>{d.funcion}</b></div>
+              <div className="device-meta-row"><span>Conexión:</span><b>{d.conexion}</b></div>
             </div>
 
             <div className="device-card-foot">
@@ -967,12 +980,15 @@ export function Devices({ c }: { c: Ctx }) {
       </div>
 
       <Glass style={{ marginTop: 22 }}>
-        <h2>Parámetros de Calibración Metrológica</h2>
+        <div className="card-top-row">
+          <h2>Calibración de la Sesión de Captura</h2>
+          {s && <span className="tag-pill">Sesión #{s.id}</span>}
+        </div>
         <div className="statlist">
-          <div><small>Distancia Entre Sensores</small><b>5.000 ± 0.002 m</b></div>
-          <div><small>Límite de Tramo</small><b>{LIMIT} km/h</b></div>
-          <div><small>Certificado INACAL</small><b>INACAL-2026-V88</b></div>
-          <div><small>Última Verificación</small><b>27 oct 2026 · 06:00</b></div>
+          <div><small>Distancia Entre Barreras</small><b>{s ? `${Number(s.distancia_m).toFixed(3)} m` : '—'}</b></div>
+          <div><small>Límite de Tramo</small><b>{s ? `${Number(s.limite_kmh)} km/h` : '—'}</b></div>
+          <div><small>Incertidumbre</small><b>{s ? `± ${Number(s.incertidumbre_kmh).toFixed(1)} km/h` : '—'}</b></div>
+          <div><small>Sesión Iniciada</small><b>{s ? fechaCorta(s.iniciada_en) : '—'}</b></div>
         </div>
       </Glass>
     </>
@@ -982,29 +998,31 @@ export function Devices({ c }: { c: Ctx }) {
 /* ---------------- Configuración ---------------- */
 export function Settings({ c }: { c: Ctx }) {
   const [confirm, setConfirm] = useState(false);
+  const s = useSesionCaptura();
+  const conFoto = c.events.filter((e) => e.photoId != null).length;
 
   const params = [
     {
-      title: 'Distancia entre sensores ópticos',
-      sub: 'Separación calibrada entre barreras infrarrojas A y B',
-      val: '5.00',
+      title: 'Distancia entre barreras',
+      sub: 'Separación medida en campo entre las barreras 1 y 2',
+      val: s ? Number(s.distancia_m).toFixed(2) : '—',
       unit: 'metros',
-      precision: '± 0.002 m',
+      precision: s ? 'Medida en campo' : 'Sin sesión de captura',
       icon: 'device',
-      status: 'Certificado INACAL',
+      status: s ? `Sesión #${s.id}` : '—',
     },
     {
       title: 'Límite de velocidad en tramo',
-      sub: 'Velocidad máxima reglamentaria en Av. Pacífico',
-      val: String(LIMIT),
+      sub: 'Velocidad máxima del tramo supervisado',
+      val: s ? String(Number(s.limite_kmh)) : String(LIMIT),
       unit: 'km/h',
-      precision: 'D.S. N° 025-2021-MTC',
+      precision: 'Definido al abrir la sesión',
       icon: 'speedometer',
-      status: 'Homologado',
+      status: 'Configurado',
     },
     {
       title: 'Cámara óptica asignada',
-      sub: 'Sensor fotográfico de captura y alta resolución',
+      sub: 'Sensor fotográfico de captura',
       val: 'CAM-01',
       unit: 'Av. Pacífico',
       precision: '1080p @ 30 FPS · HDR',
@@ -1012,13 +1030,13 @@ export function Settings({ c }: { c: Ctx }) {
       status: 'Sincronizado',
     },
     {
-      title: 'Tolerancia metrológica instrumental',
-      sub: 'Margen de error admisible según laboratorio',
-      val: '± 1.0',
+      title: 'Incertidumbre de medición',
+      sub: 'Margen sumado al límite antes de registrar una infracción',
+      val: s ? `± ${Number(s.incertidumbre_kmh).toFixed(1)}` : '—',
       unit: 'km/h',
-      precision: 'INACAL-2026-V88',
+      precision: s?.latencia_camara_ms != null ? `Latencia de cámara ${Number(s.latencia_camara_ms)} ms` : 'Latencia de cámara —',
       icon: 'shield',
-      status: 'Calibrado',
+      status: 'Aplicada',
     },
   ];
 
@@ -1026,11 +1044,11 @@ export function Settings({ c }: { c: Ctx }) {
     <>
       <Heading
         title="Configuración y Parámetros del Sistema"
-        sub="Calibración metrológica del radar vial, llaves criptográficas y almacenamiento de evidencias."
+        sub="Calibración de la sesión de captura y almacenamiento de evidencias."
         actions={
-          <span className="badge-pill valid">
-            <span className="b-dot" /> Calibración Vigente
-          </span>
+          s && !s.cerrada_en
+            ? <span className="badge-pill valid"><span className="b-dot" /> Sesión de captura abierta</span>
+            : <span className="badge-pill discard"><span className="b-dot" /> Sin sesión abierta</span>
         }
       />
 
@@ -1040,9 +1058,9 @@ export function Settings({ c }: { c: Ctx }) {
           <div className="card-top-row">
             <div>
               <h2>Parámetros de Radar Vial</h2>
-              <small className="muted">Variables metrológicas del cinemómetro óptico</small>
+              <small className="muted">Calibración con la que el backend calcula cada velocidad</small>
             </div>
-            <span className="cert-pill">INACAL-2026-V88</span>
+            {s && <span className="cert-pill">Sesión #{s.id}</span>}
           </div>
 
           <div className="params-list">
@@ -1075,38 +1093,38 @@ export function Settings({ c }: { c: Ctx }) {
           <div className="params-lock-footer">
             <span className="lock-icon-chip">🔒</span>
             <div>
-              <b>Parámetros Protegidos</b>
-              <small>Solo editable con firma digital de Administrador Metrológico</small>
+              <b>Parámetros por Sesión</b>
+              <small>Se fijan al abrir cada jornada de captura; para cambiarlos se abre una nueva sesión</small>
             </div>
           </div>
         </Glass>
 
-        {/* Almacenamiento Cifrado Rediseñado */}
+        {/* Almacenamiento de evidencias */}
         <Glass className="settings-panel-card">
           <div className="card-top-row">
             <div>
-              <h2>Almacenamiento Cifrado</h2>
-              <small className="muted">Depósito forense seguro y cadena de custodia</small>
+              <h2>Almacenamiento de Evidencias</h2>
+              <small className="muted">Depósito local y cadena de custodia</small>
             </div>
-            <span className="tag-pill">SSD Seguro</span>
+            <span className="tag-pill">Local</span>
           </div>
 
           <div className="storage-hero-box">
             <div className="storage-stat-row">
               <div>
-                <span className="storage-big-num">12.8</span>
-                <span className="storage-unit">GB utilizados</span>
+                <span className="storage-big-num">{conFoto}</span>
+                <span className="storage-unit">fotografías</span>
               </div>
-              <div className="storage-total">de <b>256 GB</b></div>
+              <div className="storage-total">de <b>{c.events.length} eventos</b></div>
             </div>
 
             <div className="storage-bar-track">
-              <span className="storage-bar-fill" style={{ width: '5%' }} />
+              <span className="storage-bar-fill" style={{ width: `${c.events.length ? (conFoto / c.events.length) * 100 : 0}%` }} />
             </div>
 
             <div className="storage-bar-legend">
-              <span>95% disponible para archivo RAW</span>
-              <span className="tick">Cifrado AES-256 ✓</span>
+              <span>Carpeta montada en solo lectura</span>
+              <span className="tick">SHA-256 verificado ✓</span>
             </div>
           </div>
 
@@ -1114,15 +1132,15 @@ export function Settings({ c }: { c: Ctx }) {
             <div className="security-spec-item">
               <span className="spec-dot" />
               <div>
-                <strong>Inmutabilidad Criptográfica SHA-256</strong>
-                <small>Fotogramas originales RAW y recortes preservan hash inalterable</small>
+                <strong>Integridad SHA-256</strong>
+                <small>El hash se verifica al registrar cada foto y cada vez que se muestra; si no coincide, no se muestra</small>
               </div>
             </div>
             <div className="security-spec-item">
               <span className="spec-dot" />
               <div>
-                <strong>Firmas Periciales Homologadas</strong>
-                <small>Dictámenes firmados bajo estándar D.S. N° 025-2021-MTC</small>
+                <strong>Auditoría Inalterable</strong>
+                <small>Cada cambio de estado y dictamen queda con su autor; la base de datos impide modificarlo o borrarlo</small>
               </div>
             </div>
             <div className="security-spec-item">

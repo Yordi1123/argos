@@ -192,10 +192,11 @@ Contenido heredado del diseño que **aún no corresponde al sistema real**. No l
 a datos reales o elimínalo:
 
 - Dashboard: porcentajes de tendencia, sparklines, gráfico de área y "Vehículos supervisados 1,284".
-- Reportes: los cuatro gráficos de barras y "Conformidad legal 100 % / D.S. N° 025-2021-MTC".
-- Dispositivos: toda la página (IP, firmware, latencias y uptime de ejemplo).
-- Configuración: valores de calibración fijos, "Certificado INACAL", "12.8 GB", "Cifrado AES-256" (no existe
-  cifrado en reposo).
+- Reportes: los cuatro gráficos de barras y los porcentajes de tendencia de los KPI.
+- Dispositivos: el estado "Activo / Enlace estable" de cada equipo es fijo (no hay telemetría del agente).
+  La calibración sí viene de la sesión de captura.
+- Configuración: "CAM-01 · 1080p @ 30 FPS" fijo. La calibración y el conteo de evidencias son reales.
+- No volver a poner certificaciones (INACAL), normas (D.S.) ni cifrados (AES) que el sistema no tiene.
 - Monitoreo en tiempo real (decisión del equipo para demostraciones, sin rótulo en la UI): el video
   `public/monitoreo.mp4` es una grabación en bucle y las lecturas del radar, cortes de barrera y "Vehículos
   medidos" se generan en el navegador (`src/radar.ts`). Reemplazar por la telemetría del agente real.

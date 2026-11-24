@@ -314,7 +314,7 @@ export default function App() {
     review: () => <Detail c={ctx} review key="r" />,
     detail: () => <Detail c={ctx} review={false} key="d" />,
     reports: () => <Reports c={ctx} />,
-    device: () => <Devices c={ctx} />,
+    device: () => <Devices />,
     settings: () => <Settings c={ctx} />,
     users: () => <Users yo={user} toast={toast} onMiNombre={(nombre) => setUser({ ...user, nombre })} />,
   };

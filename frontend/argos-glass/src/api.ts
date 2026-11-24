@@ -98,6 +98,12 @@ export interface Auditoria {
   actor: string; detalle: Record<string, unknown>; creado_en: string;
 }
 
+/** Jornada de captura con su calibración (distinta de la sesión de acceso `Sesion`). */
+export interface SesionCaptura {
+  id: number; ubicacion: string; distancia_m: Num; limite_kmh: Num; incertidumbre_kmh: Num;
+  latencia_camara_ms: Num | null; iniciada_en: string; cerrada_en: string | null;
+}
+
 export interface EventoDetalle {
   id: string; sesion_id: number; estado: Estado; motivo_incierto: string | null;
   velocidad_kmh: Num; t1_us: number; t2_us: number; duracion_corte_ms: Num | null; ocurrido_en: string;
@@ -184,6 +190,7 @@ export const api = {
       comentario: comentario || null,
     })),
   urlEvidencia: (id: number) => `/api/evidencias/${id}/archivo`,
+  sesionesCaptura: () => pedir<SesionCaptura[]>('/api/sesiones'),
 
   // Módulo de visión artificial (YOLOv11s + OCR)
   visionEstado: (sondeo = false) => pedir<EstadoVision>('/api/vision/estado', { sondeo }),

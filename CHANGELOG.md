@@ -44,6 +44,7 @@ Secciones por versión: **Agregado**, **Cambiado**, **Obsoleto**, **Eliminado**,
 - Usuarios de demostración `@argos.local`: los que firmaron dictámenes quedan desactivados.
 
 ### Corregido
+- Afirmaciones que el sistema no cumple: se quitaron "Certificado INACAL", "Cifrado AES-256", "12.8 GB de 256 GB", "Conformidad legal 100 % / D.S. N° 025-2021-MTC", "Firmas periciales homologadas", la cadena de custodia "Certificada" y el diagnóstico de hardware inventado. Configuración y Dispositivos muestran la calibración real de la sesión de captura (distancia, límite, incertidumbre, latencia) y el conteo real de fotografías; Reportes muestra el porcentaje de eventos con placa leída por IA.
 - Velocímetro: el resplandor dejaba un rectángulo con bordes visibles (sobre todo en modo claro); ahora se desvanece por completo.
 - Detección de placas: las fotos de más de ~750 KB fallaban con 413 porque nginx limita las peticiones a 1 MB; `/api/vision/detectar` ahora acepta hasta 15 MB.
 - Servicio `vision` no arrancaba (`libxcb.so.1`): ultralytics instalaba OpenCV con interfaz gráfica; ahora la imagen usa solo la versión headless. Además, ya no publica el puerto 8001: su `/detectar` no tiene autenticación y solo se usa a través del backend.
