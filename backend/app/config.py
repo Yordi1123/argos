@@ -5,6 +5,7 @@ class Config(BaseSettings):
     database_url: str = "postgresql://argos:argos@db:5432/argos"
     evidencias_dir: str = "/data/evidencias"
     cors_origenes: str = "http://localhost:8080"
+    vision_url: str = "http://localhost:8001"
 
     # Autenticación ------------------------------------------------------------
     # OAuth Client ID (tipo "Aplicación web") de Google Cloud. No es un secreto.

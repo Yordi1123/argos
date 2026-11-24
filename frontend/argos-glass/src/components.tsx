@@ -4,6 +4,7 @@ import { api } from './api';
 
 const iconPaths: Record<string, string> = {
   dash: 'M4 4h6v6H4zm10 0h6v6h-6zM4 14h6v6H4zm10 0h6v6h-6z',
+  detect: 'M3 8V4h4M17 4h4v4M21 16v4h-4M7 20H3v-4M7 10h10v4H7z',
   monitor: 'M3 4h18a1 1 0 0 1 1 1v12a1 1 0 0 1-1 1H3a1 1 0 0 1-1-1V5a1 1 0 0 1 1-1zm5 16h8m-4-2v2',
   events: 'M5 3h14a1 1 0 0 1 1 1v16a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1V4a1 1 0 0 1 1-1zm3 5h8m-8 4h8m-8 4h5',
   image: 'M3 4a1 1 0 0 1 1-1h16a1 1 0 0 1 1 1v16a1 1 0 0 1-1 1H4a1 1 0 0 1-1-1V4zm1 14 6-6 4 4 3-3 5 5M8.5 8.5a1 1 0 1 0 0-2 1 1 0 0 0 0 2z',
@@ -478,7 +479,7 @@ export function EventTable({
                 {full && (
                   <td>
                     <span className="ai-engine-chip">
-                      <span className="ai-pulse-dot" /> YOLOv8
+                      <span className="ai-pulse-dot" /> {e.modelVersion ?? (e.estado === 'EN_COLA' ? 'En cola' : 'Sin análisis')}
                     </span>
                   </td>
                 )}

@@ -99,7 +99,7 @@ def enviar(api, sidecar: Path):
     print(f"  ✓ {r['id'][:8]} {r['velocidad_kmh']:6.2f} km/h → {r['estado']}")
 
 
-def capturar(api, sesion, limite, incertidumbre):
+def capturar(api, sesion, limite, incertidumbre, foto_origen: Path | None = None):
     velocidad = random.uniform(limite + incertidumbre + 0.5, limite * 1.8)
     t1 = random.randint(1_000_000, 9_000_000_000)
     t2 = t1 + round(DISTANCIA_M / (velocidad / 3.6) * 1_000_000)
@@ -108,18 +108,20 @@ def capturar(api, sesion, limite, incertidumbre):
     eid = str(uuid.uuid4())
     carpeta = RAIZ / ahora.strftime("%Y-%m-%d")
     carpeta.mkdir(parents=True, exist_ok=True)
-    foto = carpeta / f"{eid}.png"
-    foto.write_bytes(png_de_prueba())                         # 1) persistir primero
+    ext = foto_origen.suffix.lower() if foto_origen and foto_origen.suffix else ".png"
+    foto = carpeta / f"{eid}{ext}"
+    contenido = foto_origen.read_bytes() if foto_origen else png_de_prueba()
+    foto.write_bytes(contenido)                               # 1) persistir primero
 
     carga = {
         "id": eid, "sesion_id": sesion, "t1_us": t1, "t2_us": t2,
         "ocurrido_en": ahora.isoformat(),
         "duracion_corte_ms": round(random.uniform(150, 400), 1),
-        "motivo_incierto": "Barrera 1 cortada dos veces" if random.random() < 0.1 else None,
+        "motivo_incierto": None if foto_origen else ("Barrera 1 cortada dos veces" if random.random() < 0.1 else None),
         "evidencias": [{
             "tipo": "FOTO",
             "ruta": str(foto.relative_to(RAIZ)),
-            "sha256": hashlib.sha256(foto.read_bytes()).hexdigest(),
+            "sha256": hashlib.sha256(contenido).hexdigest(),
             "capturada_en": ahora.isoformat(),
         }],
     }
@@ -152,7 +154,8 @@ def main():
     p.add_argument("--api", default="http://localhost:8000")
     p.add_argument("--sesion", type=int, help="ID de sesión abierta (si no, se crea una)")
     p.add_argument("--eventos", type=int, default=5)
-    p.add_argument("--analizar", action="store_true", help="simular también el módulo de visión")
+    p.add_argument("--foto", type=Path, help="Imagen o carpeta de fotos reales para encolar hacia YOLOv11s")
+    p.add_argument("--analizar", action="store_true", help="simular también el módulo de visión (no usar si corre el servicio vision)")
     p.add_argument("--reenviar", action="store_true", help="solo reenviar eventos pendientes")
     a = p.parse_args()
 
@@ -162,6 +165,18 @@ def main():
         for s in pendientes:
             enviar(a.api, s)
         return
+
+    fotos_reales: list[Path] = []
+    if a.foto:
+        if a.foto.is_dir():
+            fotos_reales = sorted(
+                f for f in a.foto.iterdir()
+                if f.is_file() and f.suffix.lower() in {".jpg", ".jpeg", ".png", ".webp"}
+            )
+        elif a.foto.is_file():
+            fotos_reales = [a.foto]
+        if not fotos_reales:
+            raise SystemExit(f"✗ No se encontraron imágenes válidas en {a.foto}")
 
     if a.sesion:
         sesion = next(s for s in llamar(a.api, "GET", "/api/sesiones") if s["id"] == a.sesion)
@@ -173,9 +188,11 @@ def main():
         })
         print(f"Sesión {sesion['id']} creada")
 
-    print(f"Capturando {a.eventos} evento(s)")
-    for _ in range(a.eventos):
-        capturar(a.api, sesion["id"], float(sesion["limite_kmh"]), float(sesion["incertidumbre_kmh"]))
+    total = len(fotos_reales) if (fotos_reales and "--eventos" not in os.sys.argv) else a.eventos
+    print(f"Capturando {total} evento(s)")
+    for i in range(total):
+        origen = fotos_reales[i % len(fotos_reales)] if fotos_reales else None
+        capturar(a.api, sesion["id"], float(sesion["limite_kmh"]), float(sesion["incertidumbre_kmh"]), origen)
     if a.analizar:
         print("Analizando cola")
         analizar(a.api)

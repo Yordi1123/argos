@@ -26,6 +26,7 @@ placa candidata para que **una persona autorizada tome la decisión final**.
 | --- | --- | --- | --- |
 | `db` | PostgreSQL 16 | Eventos, estados, evidencias (con SHA-256), análisis, revisiones, auditoría inmutable | 127.0.0.1:5432 |
 | `backend` | Python 3.12 + FastAPI | API REST, máquina de estados, decisión D2, verificación de integridad | 127.0.0.1:8000 |
+| `vision` | Python 3.12 + YOLOv11s + RapidOCR | Detección de placas peruanas desde la cola (`EN_COLA`) y prueba en memoria | solo red interna |
 | `frontend` | React + TypeScript + nginx | Panel de revisión humana | 127.0.0.1:8080 |
 
 **¿Por qué el agente de captura no está en Docker?** Necesita el puerto USB serial del ESP32
@@ -40,7 +41,7 @@ Requisitos: Docker Desktop (o Docker Engine + Compose v2) y Python 3.10+ para el
 ```bash
 cp .env.example .env          # cambiar POSTGRES_PASSWORD
 docker compose up -d --build
-docker compose ps             # los tres servicios deben estar "healthy"/"running"
+docker compose ps             # los cuatro servicios deben estar "healthy" (vision necesita vision/modelos/yolov11s_placas.pt)
 
 # Primer administrador (una sola vez): imprime una contraseña temporal que se cambia al ingresar
 docker compose exec backend python -m app.cuentas admin tu@gmail.com "Nombre Apellido"
@@ -57,6 +58,7 @@ docker compose exec backend python -m app.claves crear vision VALIDACION_IA
 
 ```bash
 python agente/simulador.py --eventos 8 --analizar   # usa ARGOS_CLAVE_AGENTE y ARGOS_CLAVE_VISION del .env
+python agente/simulador.py --foto ruta/fotos/       # fotos reales: las analiza el servicio vision (sin --analizar)
 ```
 
 Crea una sesión, genera fotos sintéticas, registra los eventos y simula el módulo de visión.
@@ -188,9 +190,8 @@ argos/
 ## Pendiente antes del piloto
 
 - [x] **Autenticación.** Correo + contraseña (Argon2id) para personas, claves de API para servicios.
+- [x] **Módulo de visión real (`vision/`).** YOLOv11s entrenado para placas peruanas + OCR offline usando `GET /api/cola` y `POST /api/eventos/{id}/analisis`.
 - [ ] Inicio de sesión con Google (código listo; falta configurar Google Cloud).
 - [ ] Agente de captura real: lectura serial del ESP32, buffer circular de cuadros RTSP, D1.
-- [ ] Módulo de visión real (YOLO + OCR) usando `GET /api/cola` y `POST /api/eventos/{id}/analisis`.
-      Puede ser un cuarto servicio Docker: no necesita USB.
 - [ ] Cambiar la contraseña de `.env` y rotar las claves de servicio en la laptop del piloto.
 - [ ] Definir el plazo de conservación de evidencias (Ley N.° 29733).

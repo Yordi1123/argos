@@ -46,7 +46,43 @@ export interface EventoResumen {
   placa_candidata: string | null;
   confianza: Num | null;
   puntaje_utilidad: Num | null;
+  modelo_version: string | null;
   foto_id: number | null;
+}
+
+export interface EstadoVision {
+  disponible: boolean;
+  estado: string;
+  modelo_version: string | null;
+  dispositivo: string | null;
+  imgsz: number | null;
+  procesados: number;
+  ultimo_evento_en: string | null;
+  cola_pendiente: number;
+  error: string | null;
+}
+
+export interface CajaDeteccion {
+  x1: number;
+  y1: number;
+  x2: number;
+  y2: number;
+  ancho_img: number;
+  alto_img: number;
+}
+
+export interface DeteccionPlaca {
+  detectada: boolean;
+  placa_candidata: string | null;
+  texto_ocr: string | null;
+  confianza: number | null;
+  confianza_deteccion: number | null;
+  confianza_ocr: number | null;
+  caja: CajaDeteccion | null;
+  recorte_base64: string | null;
+  tiempo_ms: number;
+  modelo_version: string;
+  error: string | null;
 }
 
 export interface Evidencia { id: number; tipo: 'FOTO' | 'CLIP'; ruta: string; sha256: string; capturada_en: string }
@@ -148,6 +184,11 @@ export const api = {
       comentario: comentario || null,
     })),
   urlEvidencia: (id: number) => `/api/evidencias/${id}/archivo`,
+
+  // Módulo de visión artificial (YOLOv11s + OCR)
+  visionEstado: (sondeo = false) => pedir<EstadoVision>('/api/vision/estado', { sondeo }),
+  detectarPlaca: (imagenBase64: string) =>
+    pedir<DeteccionPlaca>('/api/vision/detectar', json('POST', { imagen_base64: imagenBase64 })),
 };
 
 /** Qué puede hacer cada rol en el panel. La autorización real la aplica el backend; esto solo adapta la UI. */
@@ -204,6 +245,7 @@ export function aEvento(r: EventoResumen): TrafficEvent {
     state: estadoUI(r.estado),
     estado: r.estado,
     priority: r.puntaje_utilidad == null ? null : Number(r.puntaje_utilidad),
+    modelVersion: r.modelo_version ?? null,
     photoId: r.foto_id,
     reason: r.motivo_incierto,
     history: [],

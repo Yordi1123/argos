@@ -10,7 +10,7 @@ import { olvidarCuentaGoogle } from './google';
 import { Login } from './login';
 import { CambioContrasena } from './cuenta';
 import { Users } from './usuarios';
-import { Dashboard, Detail, Devices, EventsPage, Evidence, Monitor, Reports, Settings, type Ctx } from './pages';
+import { Dashboard, DeteccionPlacas, Detail, Devices, EventsPage, Evidence, Monitor, Reports, Settings, type Ctx } from './pages';
 
 type Theme = 'light' | 'dark';
 
@@ -309,6 +309,7 @@ export default function App() {
     dash: () => <Dashboard c={ctx} />,
     events: () => <EventsPage c={ctx} />,
     monitor: () => <Monitor c={ctx} />,
+    detect: () => <DeteccionPlacas c={ctx} />,
     image: () => <Evidence c={ctx} />,
     review: () => <Detail c={ctx} review key="r" />,
     detail: () => <Detail c={ctx} review={false} key="d" />,

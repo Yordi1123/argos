@@ -223,12 +223,12 @@ def listar_eventos(
         return conn.execute(
             """SELECT e.id, e.sesion_id, e.velocidad_kmh, e.estado, e.motivo_incierto,
                       e.ocurrido_en, s.limite_kmh,
-                      a.placa_candidata, a.confianza, a.puntaje_utilidad,
+                      a.placa_candidata, a.confianza, a.puntaje_utilidad, a.modelo_version,
                       (SELECT id FROM evidencias WHERE evento_id = e.id AND tipo = 'FOTO'
                        ORDER BY id LIMIT 1) AS foto_id
                FROM eventos e
                JOIN sesiones s ON s.id = e.sesion_id
-               LEFT JOIN LATERAL (SELECT placa_candidata, confianza, puntaje_utilidad
+               LEFT JOIN LATERAL (SELECT placa_candidata, confianza, puntaje_utilidad, modelo_version
                                   FROM analisis WHERE evento_id = e.id AND error IS NULL
                                   ORDER BY intento DESC LIMIT 1) a ON TRUE
                WHERE (%(estado)s::estado_evento IS NULL OR e.estado = %(estado)s::estado_evento)

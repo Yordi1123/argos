@@ -10,6 +10,10 @@ Secciones por versión: **Agregado**, **Cambiado**, **Obsoleto**, **Eliminado**,
 ## [Sin publicar]
 
 ### Agregado
+- Módulo de visión real (`vision/`) con **YOLOv11s** (`yolov11s_placas.pt`, entrenado en Google Colab a 800×800 sobre placas peruanas) + **OCR offline** (`rapidocr-onnxruntime`), integrado como cuarto servicio en Docker Compose.
+- Endpoints `/api/vision/estado` y `/api/vision/detectar` en el backend y tarjeta interactiva en *Monitoreo en tiempo real* para verificar el estado del modelo YOLOv11s y probar la detección de placas en memoria desde el navegador.
+- Panel: sección propia **Detección de placas** en el menú (acceso también desde *Monitoreo en tiempo real*): se sube o arrastra la foto de un vehículo y YOLOv11s + OCR intenta detectar y leer la placa, sin crear eventos ni guardar la imagen.
+- Parámetro `--foto` en `agente/simulador.py` para encolar eventos con fotografías reales hacia el servicio `vision`.
 - Panel: saludo según la hora de Lima con el nombre de la persona, resumen real según su rol y "último ingreso" como aviso de seguridad; bienvenida y primeros pasos en el primer ingreso de un administrador.
 - Panel: fondo propio abstracto ("la vía de noche") y modo claro real ("amanecer en la vía"); si no se eligió tema, sigue el del sistema.
 - Administración: editar el nombre de una cuenta.
@@ -38,6 +42,9 @@ Secciones por versión: **Agregado**, **Cambiado**, **Obsoleto**, **Eliminado**,
 - Usuarios de demostración `@argos.local`: los que firmaron dictámenes quedan desactivados.
 
 ### Corregido
+- Servicio `vision` no arrancaba (`libxcb.so.1`): ultralytics instalaba OpenCV con interfaz gráfica; ahora la imagen usa solo la versión headless. Además, ya no publica el puerto 8001: su `/detectar` no tiene autenticación y solo se usa a través del backend.
+- La tarjeta de pruebas de visión aparecía también dentro del detalle de un evento; queda solo en *Monitoreo en tiempo real*.
+- La velocidad en la tabla de eventos casi no se leía en modo oscuro (rojo oscuro sobre vidrio oscuro); ahora usa un tono para cada tema.
 - Cambiar el tema del panel alteraba la página de inicio: el tema ahora solo existe dentro del panel.
 - Animaciones de rebote al pasar el mouse (tarjetas, botones, menú, logo): ahora solo cambian color, borde y sombra; transiciones de 150–200 ms y se respeta "reducir movimiento".
 - Un espacio invisible al inicio o al final de la contraseña (al copiar y pegar) impedía entrar; ahora se ignoran al guardarla y al ingresar.

@@ -60,3 +60,8 @@ class EventoCreado(BaseModel):
     id: UUID
     velocidad_kmh: float
     estado: str
+
+
+class PruebaVisionEntrada(BaseModel):
+    """Imagen codificada en base64 para probar YOLOv11s + OCR en memoria desde el panel."""
+    imagen_base64: str = Field(min_length=32, max_length=14_000_000)

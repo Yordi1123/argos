@@ -3,6 +3,7 @@ import { LIMIT, STATES, type EventState, type Page, type TrafficEvent } from './
 import { puede, REVISABLES, type Auditoria, type EventoDetalle, type Sesion } from './api';
 import { cuandoFue, resumenParaRol, tituloSaludo } from './saludo';
 import { AuditTimeline, Badge, Bars, Camera, EventTable, Gauge, Glass, Heading, Icon, ModernAreaChart, PlateTag, Road, Sparkline, TrendPill } from './components';
+import { PanelVision } from './vision';
 
 export interface Ctx {
   events: TrafficEvent[];
@@ -489,17 +490,36 @@ export function Evidence({ c }: { c: Ctx }) {
   );
 }
 
+/* ---------------- Detección de placas (prueba del modelo con una foto) ---------------- */
+export function DeteccionPlacas({ c }: { c: Ctx }) {
+  return (
+    <>
+      <Heading
+        title="Detección de Placas"
+        sub="Sube la foto de un vehículo: YOLOv11s busca la placa y el OCR intenta leerla. Es solo una prueba: no crea eventos ni guarda la imagen."
+      />
+      <PanelVision toast={c.toast} />
+    </>
+  );
+}
+
 /* ---------------- Monitor en Vivo ---------------- */
 export function Monitor({ c }: { c: Ctx }) {
   const ev = c.events[c.selected] ?? c.events[0];
-  if (!ev) return <NoEvents c={c} title="Monitoreo en Tiempo Real" />;
+  if (!ev) {
+    return <NoEvents c={c} title="Monitoreo en Tiempo Real" />;
+  }
   const d = c.detail?.id === ev.id ? c.detail : null;
+  const ultimo = d?.analisis.filter((a) => !a.error).at(-1);
   return (
     <>
       <Heading
         title="Monitoreo en Tiempo Real"
         sub="Punto de control 01 · Av. Pacífico, UPIS Belén · Telemetría óptica activa"
-        actions={<span className="badge-pill valid"><span className="b-dot" />Radar Operativo</span>}
+        actions={<>
+          <button className="glass-btn sm" id="btn-ir-deteccion" onClick={() => c.go('detect')}>Probar detección de placas</button>
+          <span className="badge-pill valid"><span className="b-dot" />Radar Operativo</span>
+        </>}
       />
       <div className="v5-analytics-grid">
         <Glass>
@@ -512,7 +532,7 @@ export function Monitor({ c }: { c: Ctx }) {
           <Camera ev={ev} frame={c.frame} />
           <div className="statlist">
             <div><small>MODO DE CAPTURA</small><b>Buffer Circular · 30 FPS</b></div>
-            <div><small>INFERENCIA DE VISIÓN</small><b>YOLOv8 Edge AI</b></div>
+            <div><small>INFERENCIA DE VISIÓN</small><b>{ultimo?.modelo_version ?? ev.modelVersion ?? 'En cola'}</b></div>
           </div>
         </Glass>
 

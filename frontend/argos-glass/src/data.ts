@@ -24,13 +24,15 @@ export interface TrafficEvent {
   estado: Estado;
   /** Puntaje D2 (0–1): solo ordena la cola, no decide. */
   priority: number | null;
+  /** Versión del modelo de visión que analizó el evento (null si aún está en cola). */
+  modelVersion: string | null;
   photoId: number | null;
   reason: string | null;
   history: string[];
 }
 
 export type Page =
-  | 'landing' | 'login' | 'dash' | 'monitor' | 'events' | 'image' | 'review'
+  | 'landing' | 'login' | 'dash' | 'monitor' | 'detect' | 'events' | 'image' | 'review'
   | 'reports' | 'device' | 'settings' | 'users' | 'detail';
 
 /** Límite por defecto para gráficos decorativos; cada evento trae el de su sesión. */
@@ -39,6 +41,7 @@ export const LIMIT = 40;
 export const menus: [Page, string][] = [
   ['dash', 'Dashboard'],
   ['monitor', 'Monitoreo en tiempo real'],
+  ['detect', 'Detección de placas'],
   ['events', 'Eventos detectados'],
   ['image', 'Evidencias'],
   ['review', 'Revisión de placas'],
@@ -58,12 +61,12 @@ export function permitida(p: Page, rol?: Rol): boolean {
   if (p === 'review') return puede.revisar(rol);
   if (p === 'users') return puede.administrar(rol);
   if (p === 'device' || p === 'settings') return puede.operar(rol);
-  return true; // dash, monitor, events, image, reports, detail: cualquier rol con sesión
+  return true; // dash, monitor, detect, events, image, reports, detail: cualquier rol con sesión
 }
 
 /** Vehículo ilustrativo para la pantalla de acceso (no muestra evidencia real antes de ingresar). */
 export const DEMO_EVENT: TrafficEvent = {
   id: 'demo', shortId: 'ARG-DEMO', date: '', dateLabel: '', time: '', speed: 0, limit: LIMIT,
   plate: 'ARG-000', originalPlate: 'ARG-000', confidence: 0, state: 'Pendiente', estado: 'EN_REVISION',
-  priority: null, photoId: null, reason: null, history: [],
+  priority: null, modelVersion: null, photoId: null, reason: null, history: [],
 };

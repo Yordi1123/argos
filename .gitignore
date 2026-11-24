@@ -11,6 +11,11 @@ __pycache__/
 *.pyc
 .venv/
 
+# Pesos de modelos (binarios pesados: no subir a git)
+vision/modelos/*.pt
+vision/modelos/*.onnx
+!vision/modelos/.gitkeep
+
 # Node
 node_modules/
 dist/

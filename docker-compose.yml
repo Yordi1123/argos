@@ -1,6 +1,7 @@
 # ARGOS · Servicios del sistema
 #   db        PostgreSQL: eventos, estados, auditoría
 #   backend   FastAPI: API REST y entrega de evidencias verificadas
+#   vision    YOLOv11s + OCR: detección automática de placas desde la cola
 #   frontend  React + TypeScript servido por nginx: panel de revisión
 #
 # El agente de captura (ESP32 por USB serial + cámara RTSP) corre FUERA de Docker,
@@ -36,6 +37,7 @@ services:
       DATABASE_URL: postgresql://${POSTGRES_USER:-argos}:${POSTGRES_PASSWORD}@db:5432/${POSTGRES_DB:-argos}
       EVIDENCIAS_DIR: /data/evidencias
       CORS_ORIGENES: http://localhost:${PANEL_PUERTO:-8080},http://localhost:5173
+      VISION_URL: http://vision:8001
       GOOGLE_CLIENT_ID: ${GOOGLE_CLIENT_ID:-}
       TZ: America/Lima
     volumes:
@@ -44,6 +46,24 @@ services:
       - "127.0.0.1:${API_PUERTO:-8000}:8000"    # el agente de captura llama aquí
     depends_on:
       db:
+        condition: service_healthy
+
+  vision:
+    build: ./vision
+    restart: unless-stopped
+    environment:
+      API_URL: http://backend:8000
+      EVIDENCIAS_DIR: /data/evidencias
+      ARGOS_CLAVE_VISION: ${ARGOS_CLAVE_VISION:-}
+      MODELO_RUTA: /srv/modelos/yolov11s_placas.pt
+      MODELO_IMGSZ: 800
+      MODELO_DISPOSITIVO: cpu
+      TZ: America/Lima
+    volumes:
+      - ./data/evidencias:/data/evidencias:ro   # solo lectura: preserva integridad SHA-256
+    # Sin puerto publicado: solo el backend (con sesión) le habla por la red interna.
+    depends_on:
+      backend:
         condition: service_healthy
 
   frontend:

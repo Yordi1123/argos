@@ -8,12 +8,12 @@ ARGOS is an experimental speed-enforcement prototype (UNS, Ingeniería de Softwa
 
 ## Commands
 
-Full stack (Docker Compose: `db`, `backend`, `frontend`):
+Full stack (Docker Compose: `db`, `backend`, `vision`, `frontend`):
 
 ```bash
-docker compose up -d --build        # requires POSTGRES_PASSWORD in .env (compose fails without it)
+docker compose up -d --build        # requires POSTGRES_PASSWORD in .env; vision reads vision/modelos/yolov11s_placas.pt
 docker compose ps
-docker compose logs -f backend
+docker compose logs -f backend vision
 ```
 
 - Panel: http://localhost:8080 · API docs (Swagger): http://localhost:8000/docs · health: `GET /api/salud`
@@ -24,6 +24,7 @@ Exercise the pipeline without hardware (stdlib-only Python, runs on the host, no
 
 ```bash
 python agente/simulador.py --eventos 8 --analizar   # creates a session, synthetic PNGs, events, simulated vision results
+python agente/simulador.py --foto <img|dir>         # real photos, analyzed by the vision service (don't add --analizar)
 python agente/simulador.py --reenviar               # resend pending .json sidecars
 python agente/simulador.py --sesion <id> --api http://localhost:8000
 ```
@@ -64,6 +65,7 @@ capture agent (host, USB serial + RTSP) ──writes──► data/evidencias/  
 - No users are seeded. At startup the backend only logs a warning if no active admin has a password; the first admin is created with `docker compose exec backend python -m app.cuentas admin <email> "<Name>"`.
 - Schema changes for existing databases go in a new idempotent `db/init/NN_*.sql` (applied manually with `psql -f` on existing volumes; automatically on fresh ones).
 - Config via `pydantic-settings` (`config.py`): `DATABASE_URL`, `EVIDENCIAS_DIR`, `CORS_ORIGENES` (comma-separated).
+- **Vision service (`vision/`)**: separate container (YOLOv11s `vision/modelos/yolov11s_placas.pt`, git-ignored, + RapidOCR), stdlib HTTP server on :8001 with **no published port**. A thread polls `GET /api/cola` with `ARGOS_CLAVE_VISION` and posts `/analisis`; a photo with no plate is sent as `error` (3 → `INCIERTO`), a detected-but-unreadable plate as `placa_candidata: null` with low confidence. The panel reaches it only through the backend proxy `/api/vision/{estado,detectar}` (session required; `detectar` is in-memory and never writes to disk). The Dockerfile swaps `opencv-python` (pulled by ultralytics) for the headless build; don't remove that step.
 - A "sesión" is one field-capture day with its calibration (distance, limit, uncertainty, camera latency); events can only be registered into an open session.
 
 ### Frontend (`frontend/argos-glass/`)
@@ -77,4 +79,4 @@ capture agent (host, USB serial + RTSP) ──writes──► data/evidencias/  
 
 ## Pending before pilot (from README)
 
-Real authentication (replace `X-Actor`/user picker with JWT or sessions), real capture agent (ESP32 serial, RTSP ring buffer, D1), real vision module (YOLO + OCR via `GET /api/cola` + `POST /api/eventos/{id}/analisis`, can be a 4th Docker service), replace demo users, define evidence retention period (Ley N.° 29733).
+Real authentication (replace `X-Actor`/user picker with JWT or sessions), real capture agent (ESP32 serial, RTSP ring buffer, D1), replace demo users, define evidence retention period (Ley N.° 29733).

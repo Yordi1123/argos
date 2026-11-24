@@ -145,3 +145,9 @@
 
 /* Barras de desplazamiento discretas en ambos temas */
 .v5-panel { scrollbar-color: rgba(148, 163, 184, 0.45) transparent; }
+
+/* Velocidad en la tabla de eventos: tonos legibles en cada tema (el rojo/verde oscuro solo sirve sobre claro) */
+.speed-pill.excess { color: #fca5a5; background: rgba(239, 68, 68, 0.16); border-color: rgba(248, 113, 113, 0.4); }
+.speed-pill.normal { color: #6ee7b7; background: rgba(16, 185, 129, 0.14); border-color: rgba(52, 211, 153, 0.35); }
+.v5-panel[data-theme='light'] .speed-pill.excess { color: #b91c1c; background: rgba(239, 68, 68, 0.1); border-color: rgba(239, 68, 68, 0.3); }
+.v5-panel[data-theme='light'] .speed-pill.normal { color: #047857; background: rgba(16, 185, 129, 0.1); border-color: rgba(16, 185, 129, 0.3); }
