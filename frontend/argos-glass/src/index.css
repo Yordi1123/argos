@@ -1947,7 +1947,11 @@ body { background: linear-gradient(135deg, #c3ccd8 0%, #9aa8ba 55%, #b4c0cf 100%
   --text-main: #ffffff;
   --text-sub: rgba(255,255,255,0.88);
   --text-muted: rgba(255,255,255,0.62);
-  --bg-canvas: #04170f;
+  --bg-canvas: #060d1c;
+  /* Acento: cian de las estelas de luz; ámbar para avisos */
+  --accent: #67e8f9;
+  --accent-rgb: 103, 232, 249;
+  --accent-warm: #fbbf24;
   --card-bg: linear-gradient(145deg, rgba(255,255,255,0.14), rgba(255,255,255,0.06));
   --card-border: rgba(255,255,255,0.32);
   --card-blur: blur(22px) saturate(120%);
@@ -1962,9 +1966,11 @@ body { background: linear-gradient(135deg, #c3ccd8 0%, #9aa8ba 55%, #b4c0cf 100%
   color-scheme: dark;
 }
 body {
-  background: #04170f url('/forest-bg.jpg') center / cover fixed no-repeat;
+  background: #060d1c url('/road-night.webp') center 70% / cover fixed no-repeat;
 }
-body::before { content: ''; position: fixed; inset: 0; z-index: -2; background: linear-gradient(180deg, rgba(2,20,12,0.25), rgba(2,20,12,0.45)); pointer-events: none; }
+body::before { content: ''; position: fixed; inset: 0; z-index: -2; background:
+    linear-gradient(90deg, rgba(6,13,28,0.55) 0%, rgba(6,13,28,0.25) 45%, transparent 70%),
+    linear-gradient(180deg, rgba(6,13,28,0.30) 0%, rgba(6,13,28,0.42) 55%, rgba(6,13,28,0.62) 100%); pointer-events: none; }
 .v5-bg { background: none; }
 .v5-orb, .v5-grid-pattern { display: none; }
 
@@ -2003,5 +2009,5 @@ body::before { content: ''; position: fixed; inset: 0; z-index: -2; background: 
 }
 .v5-nav-btn.active .nav-icon svg { stroke: #fff; }
 .brand-text { background: none; color: #fff; -webkit-text-fill-color: #fff; }
-.crumb-root, .sidebar-access-btn { color: #86efac; }
+.crumb-root, .sidebar-access-btn { color: var(--accent); }
 .nav-icon svg, .icon-svg { stroke: currentColor; }

@@ -7,6 +7,9 @@ from .config import config
 from .db import pool
 from .routers import eventos, sesiones
 
+# Versión del sistema (SemVer). No editar a mano: ./scripts/version.sh — ver docs/versionado.md
+VERSION = "1.0.0-alpha.1"
+
 
 @asynccontextmanager
 async def ciclo_de_vida(app: FastAPI):
@@ -15,7 +18,7 @@ async def ciclo_de_vida(app: FastAPI):
     pool.close()
 
 
-app = FastAPI(title="ARGOS API", version="0.1.0", lifespan=ciclo_de_vida)
+app = FastAPI(title="ARGOS API", version=VERSION, lifespan=ciclo_de_vida)
 app.add_middleware(
     CORSMiddleware,
     allow_origins=[o.strip() for o in config.cors_origenes.split(",")],
@@ -30,7 +33,7 @@ app.include_router(eventos.router)
 def salud():
     with pool.connection() as conn:
         conn.execute("SELECT 1")
-    return {"estado": "ok"}
+    return {"estado": "ok", "version": VERSION}
 
 
 @app.get("/api/usuarios", tags=["sistema"])

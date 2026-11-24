@@ -282,7 +282,7 @@ export function Landing({ onEnter }: { onEnter: () => void }) {
           ))}
         </div>
         <small className="lp-footer-note">
-          Prototipo académico · Ingeniería de Software II · Universidad Nacional del Santa · Nuevo Chimbote, 2026
+          Versión {__APP_VERSION__} · Prototipo académico · Ingeniería de Software II · Universidad Nacional del Santa · Nuevo Chimbote, 2026
         </small>
       </footer>
     </div>

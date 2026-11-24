@@ -32,15 +32,9 @@ Backup (needs `.env` and running `db`): `./scripts/respaldo.sh [dest]` → `resp
 
 Backend locally (outside Docker): `cd backend && pip install -r requirements.txt && DATABASE_URL=postgresql://... EVIDENCIAS_DIR=../data/evidencias uvicorn app.main:app --reload`.
 
-Frontend (`frontend/argos-glass/`, React 19 + Vite 8 + TS 7, oxlint):
+Frontend (`frontend/argos-glass/`, React 19 + Vite 8 + TS 7, oxlint): `npm ci`, `npm run dev`, `npm run build`, `npm run lint` (must pass with 0 warnings).
 
-```bash
-cd frontend/argos-glass
-npm install
-npm run dev       # Vite dev server
-npm run build     # tsc -b && vite build
-npm run lint      # oxlint
-```
+Versioning (SemVer, one version for the whole system, currently `1.0.0-alpha.N`): `./scripts/version.sh` shows/checks versions, `./scripts/version.sh X.Y.Z[-alpha.N]` syncs `frontend/argos-glass/package.json` and `VERSION` in `backend/app/main.py`. Never bump by hand. Policy, Conventional Commits, branching and release steps: `docs/versionado.md`. Log user-visible changes under `## [Sin publicar]` in `CHANGELOG.md`.
 
 There is no test suite in the repo (no pytest/vitest configured).
 
@@ -68,16 +62,14 @@ capture agent (host, USB serial + RTSP) ──writes──► data/evidencias/  
 - Config via `pydantic-settings` (`config.py`): `DATABASE_URL`, `EVIDENCIAS_DIR`, `CORS_ORIGENES` (comma-separated).
 - A "sesión" is one field-capture day with its calibration (distance, limit, uncertainty, camera latency); events can only be registered into an open session.
 
-### Frontend — in transition
+### Frontend (`frontend/argos-glass/`)
 
-- The original panel (`frontend/src/*`) was replaced by `frontend/argos-glass/`, which Compose builds (own Dockerfile + nginx.conf proxying `/api/` → `backend:8000`; Vite dev server proxies `/api` → `localhost:8000`).
-- Data flow: `src/api.ts` holds the backend types, the fetch client, and `aEvento()`, which adapts `EventoResumen` → the UI's `TrafficEvent` (`src/data.ts`). Backend states map to UI labels in `estadoUI()`: `EN_REVISION`→Pendiente, `CONFIRMADO`→Validado, `DESCARTADO`→Descartado, `INCIERTO`→No verificable, everything earlier→En análisis. Only `REVISABLES` (`EN_REVISION`, `INCIERTO`) accept a review.
-- `App.tsx` owns all state: polls `GET /api/eventos` every 5 s, loads `GET /api/eventos/{id}` for the selected event (`ctx.detail`: evidence hashes, Δt, audit trail), and `commit()` posts reviews (Confirmar/Corregir→`CONFIRMAR` with `placa_final`, Descartar→`DESCARTAR`, No verificable→`MARCAR_INCIERTO`). It passes a `Ctx` object to the page components in `pages.tsx`. Navigation is a `Page` union state, not a router.
-- Entry page is the public landing (`src/landing.tsx` + `src/landing.css`, page `'landing'`) → login → dashboard. The landing must not show real event data or evidence (privacy); its content reflects only what the system actually does.
-- Evidence images are `<img src="/api/evidencias/{id}/archivo">` (rendered by `Road` in `components.tsx` when the event has a `photoId`); the synthetic SVG road is only a fallback and the login illustration.
-- The acting reviewer is the first `REVISOR` user from `GET /api/usuarios`, a stand-in until real auth exists.
-- Still static/decorative (no backend source yet): dashboard trend %, sparklines and area chart, Reports bar charts, Devices page, Settings calibration values, Users role matrix, login form.
-- `localStorage` is only used for UI preferences (theme, sidebar), never for event data.
+**Read `frontend/argos-glass/AGENTS.md` before changing the frontend** — it is the team's tool-agnostic contract (architecture, backend contract, privacy, honesty of UI content, styling tokens, done-checklist, known debt). Key points:
+
+- `src/api.ts` is the only place that calls `fetch`; `aEvento()`/`estadoUI()` adapt backend data to the UI model in `src/data.ts`. `REVISABLES` must match `backend/app/estados.py`.
+- `App.tsx` owns all state (polls `GET /api/eventos` every 5 s, loads the selected event's detail, posts reviews) and passes a `Ctx` to `pages.tsx`. Navigation is a `Page` union state, not a router: landing → login → dashboard.
+- Business rules (speed, D2, valid transitions) are never duplicated client-side; the backend is the source of truth.
+- The public landing never shows real events/evidence; event data is never stored in `localStorage`.
 
 ## Pending before pilot (from README)
 

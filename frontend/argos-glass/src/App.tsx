@@ -255,7 +255,7 @@ export default function App() {
             </div>
             <div className="brand-text">
               ARGOS
-              <small>VISION DASHBOARD V5</small>
+              <small>v{__APP_VERSION__}</small>
             </div>
             <button
               id="btn-collapse"
@@ -315,7 +315,7 @@ export default function App() {
                 ☰
               </button>
               <div className="page-breadcrumb">
-                <span className="crumb-root">ARGOS V5</span>
+                <span className="crumb-root">ARGOS</span>
                 <span className="crumb-sep">/</span>
                 <span className="crumb-current">{title}</span>
               </div>
@@ -373,7 +373,7 @@ export default function App() {
           <main key={page} className="v5-page-container">
             {(views[page] ?? views.dash)()}
             <footer className="v5-footer">
-              <span>ARGOS V5 — Sistema Inteligente de Visión Vial · Nuevo Chimbote</span>
+              <span>ARGOS v{__APP_VERSION__} — Sistema Inteligente de Visión Vial · Nuevo Chimbote</span>
               <span>Inspirado en la estética Glassmorphism Dashboard V5</span>
             </footer>
           </main>
