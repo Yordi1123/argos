@@ -44,13 +44,17 @@
   padding: 22px 18px;
   text-align: center;
   background: rgba(var(--accent-rgb), 0.03);
-  transition: border-color 180ms ease-out, background-color 180ms ease-out;
+  transition: border-color 180ms ease-out, background-color 180ms ease-out, box-shadow 180ms ease-out;
 }
 
 .vis-dropzone.activa {
   border-color: var(--accent);
+  border-style: solid;
   background: rgba(var(--accent-rgb), 0.1);
+  box-shadow: 0 0 0 4px rgba(var(--accent-rgb), 0.14);
 }
+.vis-dropzone > .icon-svg { width: 28px; height: 28px; color: var(--text-muted); transition: color 180ms ease-out; }
+.vis-dropzone.activa > .icon-svg { color: var(--accent); }
 
 .vis-dropzone p {
   margin: 8px 0 4px;
@@ -95,10 +99,14 @@
   display: block;
   width: 100%;
   height: auto;
+  animation: vis-aparecer 0.25s ease-out both;
 }
 
 .vis-bbox {
   position: absolute;
+  outline: 2px solid transparent;
+  /* "Fijar objetivo": un marco más amplio se cierra sobre la placa detectada */
+  animation: vis-fijar 0.45s ease-out both;
   border: 2.5px solid var(--accent);
   border-radius: 4px;
   box-shadow: 0 0 0 1px rgba(0, 0, 0, 0.55), 0 0 16px rgba(var(--accent-rgb), 0.45);
@@ -107,6 +115,7 @@
 
 .vis-bbox-tag {
   position: absolute;
+  animation: vis-aparecer 0.2s ease-out 0.35s both;
   left: -2px;
   bottom: calc(100% + 4px);
   white-space: nowrap;
@@ -176,3 +185,65 @@
     transition: none;
   }
 }
+
+/* ---------------- Animaciones: cada una comunica algo (trabajando, encontrado, cuánta confianza) ---------------- */
+
+@keyframes vis-aparecer { from { opacity: 0; } to { opacity: 1; } }
+@keyframes vis-subir { from { opacity: 0; transform: translateY(4px); } to { opacity: 1; transform: none; } }
+@keyframes vis-fijar {
+  from { opacity: 0; outline-color: var(--accent); outline-offset: 14px; }
+  60% { opacity: 1; outline-color: rgba(var(--accent-rgb), 0.6); outline-offset: 0; }
+  to { opacity: 1; outline-color: transparent; outline-offset: 0; }
+}
+@keyframes vis-barrido { from { top: -12%; } to { top: 100%; } }
+@keyframes vis-brillo { from { background-position: 200% 0; } to { background-position: -200% 0; } }
+@keyframes vis-llenar { from { width: 0; } }
+@keyframes vis-girar { to { transform: rotate(360deg); } }
+
+/* Mientras el modelo trabaja: la foto se atenúa y una línea la recorre */
+.vis-escaneo {
+  position: absolute; inset: 0; overflow: hidden; pointer-events: none;
+  background:
+    linear-gradient(rgba(var(--accent-rgb), 0.06) 1px, transparent 1px) 0 0 / 100% 28px,
+    rgba(4, 12, 24, 0.35);
+  animation: vis-aparecer 0.2s ease-out both;
+}
+.vis-escaneo-linea {
+  position: absolute; left: 0; right: 0; height: 12%;
+  background: linear-gradient(180deg, transparent, rgba(103, 232, 249, 0.28) 85%, rgba(103, 232, 249, 0.9));
+  border-bottom: 1px solid rgba(165, 243, 252, 0.95);
+  animation: vis-barrido 1.6s linear infinite;
+}
+.vis-escaneo-estado {
+  position: absolute; left: 50%; bottom: 14px; transform: translateX(-50%);
+  display: inline-flex; align-items: center; gap: 8px; white-space: nowrap;
+  padding: 6px 12px; border-radius: 999px; font-size: 12px; font-weight: 700;
+  color: #e0f2fe; background: rgba(4, 12, 24, 0.78); border: 1px solid rgba(103, 232, 249, 0.35);
+  animation: vis-aparecer 0.2s ease-out both;
+}
+.vis-giro {
+  width: 12px; height: 12px; border-radius: 50%;
+  border: 2px solid rgba(103, 232, 249, 0.3); border-top-color: #67e8f9;
+  animation: vis-girar 0.8s linear infinite;
+}
+
+/* Resultado: esqueleto mientras se espera, luego aparece por partes */
+.vis-esqueleto { display: grid; gap: 12px; margin-top: 14px; }
+.vis-esqueleto span {
+  display: block; height: 14px; border-radius: 8px;
+  background: linear-gradient(90deg, var(--pill-bg) 0%, rgba(var(--accent-rgb), 0.14) 50%, var(--pill-bg) 100%) 0 0 / 200% 100%;
+  animation: vis-brillo 1.4s ease-in-out infinite;
+}
+.vis-revela { animation: vis-subir 0.24s ease-out both; animation-delay: calc(var(--i, 0) * 70ms); }
+.vis-crop-img { animation: vis-aparecer 0.3s ease-out 0.15s both; }
+
+/* Medidores de confianza: la barra se llena hasta el valor */
+.vis-barra { height: 5px; margin-top: 7px; border-radius: 99px; background: var(--pill-bg); overflow: hidden; }
+.vis-barra span {
+  display: block; height: 100%; border-radius: inherit;
+  animation: vis-llenar 0.65s cubic-bezier(0.22, 1, 0.36, 1) both;
+  animation-delay: inherit;
+}
+.vis-barra .alta { background: #10b981; }
+.vis-barra .media { background: #f59e0b; }
+.vis-barra .baja { background: #ef4444; }

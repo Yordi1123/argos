@@ -1,4 +1,4 @@
-import { useCallback, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { api, type DeteccionPlaca, type EstadoVision } from './api';
 import { Glass, Icon, PlateTag } from './components';
 import { useInterval } from './hooks';
@@ -42,6 +42,62 @@ async function prepararImagenBase64(archivo: File): Promise<string> {
   });
 }
 
+const reducirMovimiento = () => window.matchMedia?.('(prefers-reduced-motion: reduce)').matches ?? false;
+
+/** Cuenta de 0 al valor (≈0,65 s, desacelerando). El componente se monta de nuevo con cada resultado (key). */
+function useConteo(objetivo: number | null, ms = 650) {
+  const [progreso, setProgreso] = useState(0);
+  const animar = objetivo != null && !reducirMovimiento();
+  useEffect(() => {
+    if (!animar) return;
+    let cuadro = 0;
+    const inicio = performance.now();
+    const paso = (t: number) => {
+      const p = Math.min(1, (t - inicio) / ms);
+      setProgreso(1 - (1 - p) ** 3);
+      if (p < 1) cuadro = requestAnimationFrame(paso);
+    };
+    cuadro = requestAnimationFrame(paso);
+    return () => cancelAnimationFrame(cuadro);
+  }, [animar, ms]);
+  if (objetivo == null) return 0;
+  return animar ? objetivo * progreso : objetivo;
+}
+
+/** Placa revelada carácter a carácter, como la va leyendo el OCR (se monta de nuevo con cada resultado). */
+function PlacaEscrita({ placa }: { placa: string | null }) {
+  const [n, setN] = useState(0);
+  const animar = !!placa && !reducirMovimiento();
+  useEffect(() => {
+    if (!animar || !placa) return;
+    const id = window.setInterval(() => {
+      setN((k) => {
+        if (k + 1 >= placa.length) window.clearInterval(id);
+        return Math.min(placa.length, k + 1);
+      });
+    }, 70);
+    return () => window.clearInterval(id);
+  }, [animar, placa]);
+  if (!placa) return <PlateTag plate="???-???" big />;
+  const visibles = animar ? n : placa.length;
+  return <PlateTag plate={placa.slice(0, visibles) + placa.slice(visibles).replace(/[A-Z0-9]/g, '·')} big />;
+}
+
+const nivel = (v: number) => (v >= 0.75 ? 'alta' : v >= 0.45 ? 'media' : 'baja');
+
+function Medidor({ etiqueta, valor, vacio = '—', orden }: { etiqueta: string; valor: number | null; vacio?: string; orden: number }) {
+  const animado = useConteo(valor);
+  return (
+    <div className="vis-medidor vis-revela" style={{ '--i': orden } as React.CSSProperties}>
+      <small>{etiqueta}</small>
+      <b>{valor == null ? vacio : `${(animado * 100).toFixed(1)}%`}</b>
+      <div className="vis-barra" aria-hidden>
+        {valor != null && <span className={nivel(valor)} style={{ width: `${Math.max(2, valor * 100)}%` }} />}
+      </div>
+    </div>
+  );
+}
+
 export function PanelVision({ toast }: { toast: (t: string) => void }) {
   const [estado, setEstado] = useState<EstadoVision | null>(null);
   const [vistaPrevia, setVistaPrevia] = useState<string | null>(null);
@@ -49,6 +105,7 @@ export function PanelVision({ toast }: { toast: (t: string) => void }) {
   const [resultado, setResultado] = useState<DeteccionPlaca | null>(null);
   const [analizando, setAnalizando] = useState(false);
   const [arrastrando, setArrastrando] = useState(false);
+  const [intento, setIntento] = useState(0);
   const inputRef = useRef<HTMLInputElement | null>(null);
 
   const consultarEstado = useCallback(async (sondeo = false) => {
@@ -76,6 +133,7 @@ export function PanelVision({ toast }: { toast: (t: string) => void }) {
       setVistaPrevia(dataUrl);
       const r = await api.detectarPlaca(dataUrl);
       setResultado(r);
+      setIntento((k) => k + 1);
       if (!r.detectada) {
         toast(r.error ?? 'YOLOv11s no detectó ninguna placa en la imagen');
       }
@@ -168,8 +226,15 @@ export function PanelVision({ toast }: { toast: (t: string) => void }) {
               <div className="vis-preview-wrap">
                 <div className="vis-stage">
                   <img src={vistaPrevia} alt={`Vista previa ${nombreArchivo}`} />
+                  {analizando && (
+                    <div className="vis-escaneo" aria-hidden>
+                      <span className="vis-escaneo-linea" />
+                    </div>
+                  )}
+                  {analizando && <div className="vis-escaneo-estado" role="status"><span className="vis-giro" /> Analizando con YOLOv11s + OCR…</div>}
                   {caja && caja.ancho_img > 0 && caja.alto_img > 0 && (
                     <div
+                      key={intento}
                       className="vis-bbox"
                       style={{
                         left: `${(caja.x1 / caja.ancho_img) * 100}%`,
@@ -209,47 +274,43 @@ export function PanelVision({ toast }: { toast: (t: string) => void }) {
           </div>
 
           {analizando ? (
-            <div className="empty-cell">Ejecutando detección YOLOv11s y lectura OCR…</div>
+            <div className="vis-esqueleto" aria-label="Analizando imagen">
+              <span style={{ width: '62%', height: 54 }} />
+              <span style={{ width: '45%' }} />
+              <span style={{ width: '90%' }} />
+              <span style={{ width: '75%' }} />
+            </div>
           ) : !resultado ? (
             <div className="empty-cell">
               Carga una fotografía para visualizar el recuadro detectado por YOLOv11s, el recorte de la placa y la lectura OCR.
             </div>
           ) : !resultado.detectada ? (
-            <div className="glass-notice">
+            <div className="glass-notice vis-revela" key={intento}>
               <b>Sin detección:</b> {resultado.error ?? 'No se encontró ninguna placa en la fotografía con el umbral actual.'}
             </div>
           ) : (
-            <>
-              <div style={{ margin: '12px 0' }}>
-                <PlateTag plate={resultado.placa_candidata ?? '???-???'} big />
+            <div key={intento}>
+              <div className="vis-revela" style={{ margin: '12px 0', '--i': 0 } as React.CSSProperties}>
+                <PlacaEscrita placa={resultado.placa_candidata} />
               </div>
 
               {resultado.recorte_base64 && (
-                <div style={{ marginBottom: 14 }}>
+                <div className="vis-revela" style={{ marginBottom: 14, '--i': 1 } as React.CSSProperties}>
                   <small className="muted">RECORTE EXTRAÍDO POR YOLOV11S</small>
                   <img src={resultado.recorte_base64} alt="Recorte de placa detectada" className="vis-crop-img" />
                 </div>
               )}
 
               <div className="statlist">
-                <div>
-                  <small>Confianza YOLOv11s (Caja)</small>
-                  <b>{resultado.confianza_deteccion != null ? `${(resultado.confianza_deteccion * 100).toFixed(1)}%` : '—'}</b>
-                </div>
-                <div>
-                  <small>Confianza OCR (Texto)</small>
-                  <b>{resultado.confianza_ocr != null ? `${(resultado.confianza_ocr * 100).toFixed(1)}%` : 'Ilegible'}</b>
-                </div>
-                <div>
-                  <small>Confianza Combinada</small>
-                  <b>{resultado.confianza != null ? `${(resultado.confianza * 100).toFixed(1)}%` : '—'}</b>
-                </div>
-                <div>
+                <Medidor orden={2} etiqueta="Confianza YOLOv11s (Caja)" valor={resultado.confianza_deteccion} />
+                <Medidor orden={3} etiqueta="Confianza OCR (Texto)" valor={resultado.confianza_ocr} vacio="Ilegible" />
+                <Medidor orden={4} etiqueta="Confianza Combinada" valor={resultado.confianza} />
+                <div className="vis-revela" style={{ '--i': 5 } as React.CSSProperties}>
                   <small>Lectura OCR Cruda</small>
                   <b>{resultado.texto_ocr ?? '—'}</b>
                 </div>
               </div>
-            </>
+            </div>
           )}
 
           <p className="vis-privacy-note">
