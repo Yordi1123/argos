@@ -10,6 +10,7 @@ Secciones por versión: **Agregado**, **Cambiado**, **Obsoleto**, **Eliminado**,
 ## [Sin publicar]
 
 ### Agregado
+- Landing: video de vehículos circulando en el recuadro "Vista ilustrativa · punto de control" (720p, 4,3 MB, sin sonido, en bucle; respeta "reducir movimiento" del sistema y vuelve a la ilustración si el video no carga).
 - Inicio de sesión con correo y contraseña. Las contraseñas se guardan solo como hash Argon2id.
 - Cuentas creadas por un administrador con contraseña temporal (se muestra una vez) que se cambia obligatoriamente en el primer ingreso.
 - Bloqueo de 15 min tras 5 intentos fallidos; el mensaje de error no revela si la cuenta existe.
@@ -34,6 +35,8 @@ Secciones por versión: **Agregado**, **Cambiado**, **Obsoleto**, **Eliminado**,
 - Usuarios de demostración `@argos.local`: los que firmaron dictámenes quedan desactivados.
 
 ### Corregido
+- Un espacio invisible al inicio o al final de la contraseña (al copiar y pegar) impedía entrar; ahora se ignoran al guardarla y al ingresar.
+- Una contraseña con tildes o ñ podía no coincidir si el teclado las enviaba como letra + tilde combinada; ahora se normaliza (Unicode NFKC) antes de guardarla y de compararla.
 - Un dictamen sobre un evento inexistente respondía 500; ahora 404. Un identificador mal formado responde 422.
 
 ### Seguridad

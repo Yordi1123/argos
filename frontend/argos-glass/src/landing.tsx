@@ -72,6 +72,29 @@ const STACK = [
 
 const FLOW = ['EVIDENCIA_GUARDADA', 'EN_COLA', 'ANALIZADO', 'EN_REVISION', 'CONFIRMADO · DESCARTADO'];
 
+/** Video del punto de control. Sin video (error de carga) se muestra la ilustración animada. */
+function VideoPuntoControl() {
+  const [falla, setFalla] = useState(false);
+  // Respeta "reducir movimiento" del sistema: no se reproduce solo, se ofrece con controles.
+  const [quieto] = useState(() => window.matchMedia?.('(prefers-reduced-motion: reduce)').matches ?? false);
+  if (falla) return <Road ev={DEMO_EVENT} />;
+  return (
+    <video
+      className="lp-frame-video"
+      src="/punto-control.mp4"
+      poster="/punto-control.webp"
+      autoPlay={!quieto}
+      controls={quieto}
+      muted
+      loop
+      playsInline
+      preload={quieto ? 'none' : 'auto'}
+      aria-label="Video ilustrativo: vehículos circulando por una vía"
+      onError={() => setFalla(true)}
+    />
+  );
+}
+
 export function Landing({ onEnter }: { onEnter: () => void }) {
   const [scrolled, setScrolled] = useState(false);
   const [menu, setMenu] = useState(false);
@@ -148,7 +171,9 @@ export function Landing({ onEnter }: { onEnter: () => void }) {
                 <span className="lp-dots"><i /><i /><i /></span>
                 <span>Vista ilustrativa · punto de control</span>
               </div>
-              <div className="lp-frame-img"><Road ev={DEMO_EVENT} /></div>
+              <div className="lp-frame-img">
+                <VideoPuntoControl />
+              </div>
             </Glass>
             <div className="lp-float lp-float-a">
               <Icon name="speedometer" />

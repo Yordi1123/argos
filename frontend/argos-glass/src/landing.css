@@ -283,3 +283,6 @@
   .lp-footer { grid-template-columns: 1fr; }
   .lp-footer-links { justify-content: flex-start; }
 }
+
+/* Video del punto de control (hero) */
+.lp-frame-video { display: block; width: 100%; height: auto; aspect-ratio: 16 / 9; object-fit: cover; background: #050b16; }

@@ -18,8 +18,10 @@ export function CambioContrasena({ user, obligatorio, onListo, onCancelar }: {
   const [enviando, setEnviando] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
+  // El backend ignora los espacios al inicio y al final: se valida igual aquí.
+  const limpia = nueva.trim();
   const reglas = [
-    { ok: nueva.length >= MIN, txt: `Al menos ${MIN} caracteres (una frase es más fácil de recordar)` },
+    { ok: limpia.length >= MIN, txt: `Al menos ${MIN} caracteres (una frase es más fácil de recordar)` },
     { ok: !!nueva && nueva !== actual, txt: 'Distinta de la contraseña actual' },
     { ok: !!nueva && nueva.toLowerCase() !== user.email.toLowerCase(), txt: 'Distinta de tu correo' },
     { ok: !!nueva && nueva === repite, txt: 'Ambas contraseñas coinciden' },
@@ -70,6 +72,8 @@ export function CambioContrasena({ user, obligatorio, onListo, onCancelar }: {
       {error && <div className="lg-alerta error" role="alert">{error}</div>}
 
       <form className="login-fields-list" onSubmit={enviar}>
+        {/* Para que el gestor de contraseñas del navegador sepa de qué cuenta es y la actualice */}
+        <input type="text" name="username" autoComplete="username" value={user.email} readOnly hidden />
         {campo('cc-actual', obligatorio ? 'Contraseña temporal' : 'Contraseña actual', actual, setActual, 'current-password')}
         {campo('cc-nueva', 'Nueva contraseña', nueva, setNueva, 'new-password')}
         {campo('cc-repite', 'Repite la nueva contraseña', repite, setRepite, 'new-password')}
