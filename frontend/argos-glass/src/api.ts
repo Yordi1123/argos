@@ -15,6 +15,8 @@ export interface Sesion {
   tipo: 'usuario'; id: number; nombre: string; email: string; rol: Rol;
   /** Tiene contraseña temporal: el backend responde 403 a todo salvo cambiarla o salir. */
   debe_cambiar: boolean;
+  /** Ingreso anterior a esta sesión (null = primer ingreso). */
+  acceso_anterior: string | null;
 }
 
 /** Cuenta que puede entrar al panel (GET /api/usuarios, solo ADMINISTRADOR). */

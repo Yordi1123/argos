@@ -70,7 +70,7 @@ export function Badge({ state }: { state: EventState | string }) {
   );
 }
 
-export function Heading({ title, sub, actions }: { title: string; sub: string; actions?: ReactNode }) {
+export function Heading({ title, sub, actions }: { title: string; sub: ReactNode; actions?: ReactNode }) {
   return (
     <div className="dash-heading">
       <div>

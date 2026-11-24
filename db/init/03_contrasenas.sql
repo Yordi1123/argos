@@ -7,3 +7,7 @@ ALTER TABLE usuarios ADD COLUMN IF NOT EXISTS contrasena_hash         TEXT;     
 ALTER TABLE usuarios ADD COLUMN IF NOT EXISTS debe_cambiar_contrasena BOOLEAN NOT NULL DEFAULT FALSE;
 ALTER TABLE usuarios ADD COLUMN IF NOT EXISTS intentos_fallidos       INT NOT NULL DEFAULT 0;
 ALTER TABLE usuarios ADD COLUMN IF NOT EXISTS bloqueado_hasta         TIMESTAMPTZ;
+
+-- Ingreso anterior, guardado en cada sesión al abrirla: el panel lo muestra ("Tu último ingreso fue…")
+-- para que la persona note un acceso que no reconoce. En usuarios.ultimo_acceso ya queda el actual.
+ALTER TABLE sesiones_acceso ADD COLUMN IF NOT EXISTS acceso_anterior TIMESTAMPTZ;

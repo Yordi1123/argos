@@ -124,6 +124,11 @@ sistema no hace**.
 
 ## Estilos
 
+- **Temas:** el tema claro/oscuro solo existe dentro de `<div class="v5-panel" data-theme>`; la página de inicio y el
+  acceso tienen identidad fija. Nunca pongas `data-theme` en `<html>`. Variables y ajustes del modo claro en `src/tema.css`.
+- **Movimiento:** solo comunica algo. Al pasar el mouse nada se desplaza, crece ni gira (solo color, borde, sombra);
+  al presionar, `scale(0.98)`. Transiciones de 150–200 ms `ease-out`. Respeta `prefers-reduced-motion`.
+
 - **Tokens, no colores sueltos.** Colores de marca y acento desde variables de `:root` en `index.css`:
   `--accent` / `--accent-rgb` (cian), `--accent-warm` (ámbar), `--primary`, `--text-main`, `--text-sub`,
   `--text-muted`, `--divider`, `--card-*`. Para transparencias: `rgba(var(--accent-rgb), 0.2)`.

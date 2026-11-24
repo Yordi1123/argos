@@ -38,9 +38,9 @@ class CambioContrasena(BaseModel):
 GENERICO = "Correo o contraseña incorrectos"
 
 
-def _respuesta(u, debe_cambiar: bool) -> dict:
+def _respuesta(u, debe_cambiar: bool, acceso_anterior) -> dict:
     return {"tipo": "usuario", "id": u["id"], "nombre": u["nombre"], "email": u["email"], "rol": u["rol"],
-            "debe_cambiar": debe_cambiar}
+            "debe_cambiar": debe_cambiar, "acceso_anterior": acceso_anterior}
 
 
 @router.post("/ingresar")
@@ -52,7 +52,7 @@ def ingresar(datos: Ingreso, request: Request, response: Response):
     with transaccion() as conn:
         u = conn.execute(
             """SELECT id, nombre, email, rol, activo, contrasena_hash, debe_cambiar_contrasena,
-                      intentos_fallidos, bloqueado_hasta
+                      intentos_fallidos, bloqueado_hasta, ultimo_acceso
                FROM usuarios WHERE email_canonico = %s FOR UPDATE""",
             (email_canonico(email),),
         ).fetchone()
@@ -89,12 +89,12 @@ def ingresar(datos: Ingreso, request: Request, response: Response):
             anterior = request.cookies.get(COOKIE)
             if anterior:
                 cerrar_sesion(conn, anterior, "Nuevo inicio de sesión")
-            abrir_sesion(conn, u["id"], response)
+            abrir_sesion(conn, u["id"], response, u["ultimo_acceso"])
             auditar(conn, None, "INICIO_SESION", u["email"], detalle={"metodo": "contraseña"})
 
     if error:  # fuera de la transacción: la auditoría y el contador de intentos deben quedar guardados
         raise HTTPException(*error)
-    return _respuesta(u, u["debe_cambiar_contrasena"])
+    return _respuesta(u, u["debe_cambiar_contrasena"], u["ultimo_acceso"])
 
 
 @router.post("/contrasena", status_code=204)
@@ -150,7 +150,7 @@ def iniciar_sesion(datos: CredencialGoogle, request: Request, response: Response
     denegado = None
     with transaccion() as conn:
         u = conn.execute(
-            """SELECT id, nombre, email, rol, activo, google_sub FROM usuarios
+            """SELECT id, nombre, email, rol, activo, google_sub, ultimo_acceso FROM usuarios
                WHERE google_sub = %s OR (google_sub IS NULL AND email_canonico = %s)
                ORDER BY (google_sub = %s) DESC NULLS LAST LIMIT 1""",
             (sub, email_canonico(email), sub),
@@ -165,6 +165,7 @@ def iniciar_sesion(datos: CredencialGoogle, request: Request, response: Response
         if denegado:
             auditar(conn, None, "ACCESO_DENEGADO", email, detalle={"motivo": denegado})
         else:
+            anterior_acceso = u["ultimo_acceso"]
             # Primer ingreso: fija la identidad de Google y, si el admin no puso nombre, usa el de Google
             u = conn.execute(
                 """UPDATE usuarios SET google_sub = %s, ultimo_acceso = now(),
@@ -175,18 +176,18 @@ def iniciar_sesion(datos: CredencialGoogle, request: Request, response: Response
             anterior = request.cookies.get(COOKIE)
             if anterior:
                 cerrar_sesion(conn, anterior, "Nuevo inicio de sesión")
-            abrir_sesion(conn, u["id"], response)
-            auditar(conn, None, "INICIO_SESION", u["email"])
+            abrir_sesion(conn, u["id"], response, anterior_acceso)
+            auditar(conn, None, "INICIO_SESION", u["email"], detalle={"metodo": "google"})
 
     if denegado:  # fuera de la transacción para no revertir la auditoría
         raise HTTPException(403, "Tu cuenta de Google no está autorizada en ARGOS. Pide acceso a un administrador.")
-    return _respuesta(u, False)
+    return _respuesta(u, False, anterior_acceso)
 
 
 @router.get("/yo")
 def yo(actor: Actor = Depends(actor_actual)):
     return {"tipo": actor.tipo, "id": actor.id, "nombre": actor.nombre, "email": actor.email, "rol": actor.rol,
-            "debe_cambiar": actor.debe_cambiar}
+            "debe_cambiar": actor.debe_cambiar, "acceso_anterior": actor.acceso_anterior}
 
 
 @router.post("/salir", status_code=204)

@@ -44,12 +44,33 @@ function ClaveTemporal({ u, onCerrar }: { u: UsuarioConClave; onCerrar: () => vo
  * Administración de cuentas. Datos propios de la página: los pide a api.ts directamente
  * (no son estado global). La autorización real la aplica el backend (403 si no eres ADMINISTRADOR).
  */
-export function Users({ yo, toast }: { yo: Sesion; toast: (t: string) => void }) {
+export function Users({ yo, toast, onMiNombre }: {
+  yo: Sesion; toast: (t: string) => void; onMiNombre: (nombre: string) => void;
+}) {
   const [lista, setLista] = useState<Usuario[] | null>(null);
   const [form, setForm] = useState({ email: '', nombre: '', rol: 'REVISOR' as Rol });
   const [enviando, setEnviando] = useState(false);
   const [ocupado, setOcupado] = useState<number | null>(null);
   const [credencial, setCredencial] = useState<UsuarioConClave | null>(null);
+  const [editando, setEditando] = useState<{ id: number; nombre: string } | null>(null);
+
+  const guardarNombre = async () => {
+    if (!editando) return;
+    const nombre = editando.nombre.trim();
+    if (!nombre) { toast('El nombre no puede quedar vacío'); return; }
+    setOcupado(editando.id);
+    try {
+      await api.modificarUsuario(editando.id, { nombre });
+      if (editando.id === yo.id) onMiNombre(nombre);
+      toast('Nombre actualizado');
+      setEditando(null);
+      cargar();
+    } catch (e) {
+      toast((e as Error).message);
+    } finally {
+      setOcupado(null);
+    }
+  };
 
   const cargar = useCallback(() => {
     api.usuarios().then(setLista).catch((e: Error) => toast(e.message));
@@ -148,7 +169,7 @@ export function Users({ yo, toast }: { yo: Sesion; toast: (t: string) => void })
         <Glass>
           <h2>Roles y facultades</h2>
           <div className="table-responsive">
-            <table className="glass-table">
+            <table className="glass-table usr-matriz">
               <thead><tr><th>Rol</th><th>Responsabilidad</th><th>Acceso</th></tr></thead>
               <tbody>
                 {MATRIZ.map(([rol, resp, acceso]) => (
@@ -187,7 +208,28 @@ export function Users({ yo, toast }: { yo: Sesion; toast: (t: string) => void })
                 return (
                   <tr key={u.id} className={u.activo ? '' : 'usr-inactivo'}>
                     <td>
-                      <b>{u.nombre}</b>{soyYo && <span className="tag-pill usr-tu">Tú</span>}
+                      {editando?.id === u.id ? (
+                        <form className="usr-nombre-edit" onSubmit={(e) => { e.preventDefault(); void guardarNombre(); }}>
+                          <input
+                            autoFocus maxLength={120} aria-label={`Nombre de ${u.email}`} value={editando.nombre}
+                            onChange={(e) => setEditando({ id: u.id, nombre: e.target.value })}
+                            onKeyDown={(e) => { if (e.key === 'Escape') setEditando(null); }}
+                          />
+                          <button className="glass-btn sm" type="submit" disabled={ocupado === u.id}>Guardar</button>
+                          <button className="glass-btn sm" type="button" onClick={() => setEditando(null)}>Cancelar</button>
+                        </form>
+                      ) : (
+                        <>
+                          <b>{u.nombre.includes('@') ? <span className="muted">Sin nombre</span> : u.nombre}</b>
+                          {soyYo && <span className="tag-pill usr-tu">Tú</span>}
+                          <button
+                            className="usr-editar" title="Editar nombre" aria-label={`Editar nombre de ${u.email}`}
+                            onClick={() => setEditando({ id: u.id, nombre: u.nombre.includes('@') ? '' : u.nombre })}
+                          >
+                            <Icon name="edit" />
+                          </button>
+                        </>
+                      )}
                       <small className="usr-email">{u.email}</small>
                     </td>
                     <td>

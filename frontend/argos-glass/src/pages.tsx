@@ -1,6 +1,7 @@
 import { useMemo, useState } from 'react';
 import { LIMIT, STATES, type EventState, type Page, type TrafficEvent } from './data';
 import { puede, REVISABLES, type Auditoria, type EventoDetalle, type Sesion } from './api';
+import { cuandoFue, resumenParaRol, tituloSaludo } from './saludo';
 import { AuditTimeline, Badge, Bars, Camera, EventTable, Gauge, Glass, Heading, Icon, ModernAreaChart, PlateTag, Road, Sparkline, TrendPill } from './components';
 
 export interface Ctx {
@@ -69,6 +70,7 @@ export function Dashboard({ c }: { c: Ctx }) {
   const peak = c.events.reduce((m, e) => Math.max(m, e.speed), 0);
   const avgSpd = total ? c.events.reduce((a, e) => a + e.speed, 0) / total : 0;
   const [chartTab, setChartTab] = useState<'hoy' | 'semana' | 'mes'>('hoy');
+  const [primerosPasosVisto, setPrimerosPasosVisto] = useState(false);
 
   const kpis = [
     { title: 'Vehículos Supervisados', val: '1,284', sub: 'Aforo diario registrado', trend: '+14.2%', up: true, icon: 'car', page: 'monitor' as Page, color: '#3b82f6', hex: 'blue' },
@@ -80,8 +82,17 @@ export function Dashboard({ c }: { c: Ctx }) {
   return (
     <>
       <Heading
-        title="Panel General de Visión Vial"
-        sub="Monitoreo pericial en tiempo real, detección de excesos y archivo de evidencias fotográficas."
+        title={tituloSaludo(c.user)}
+        sub={
+          <>
+            {resumenParaRol(c.user, c.events, c.loaded)}
+            {c.user.acceso_anterior && (
+              <span className="dash-ultimo-acceso" title="Si no reconoces este ingreso, cambia tu contraseña">
+                {' '}Tu último ingreso fue {cuandoFue(c.user.acceso_anterior)}.
+              </span>
+            )}
+          </>
+        }
         actions={
           <div className="dash-actions">
             <button id="btn-see-events" className="glass-btn" onClick={() => c.go('events')}>
@@ -93,6 +104,18 @@ export function Dashboard({ c }: { c: Ctx }) {
           </div>
         }
       />
+
+      {!c.user.acceso_anterior && puede.administrar(c.user.rol) && !primerosPasosVisto && (
+        <Glass className="dash-primeros-pasos" role="note">
+          <span className="dash-pp-icono"><Icon name="users" /></span>
+          <div>
+            <b>Primeros pasos</b>
+            <p>Crea las cuentas de tu equipo para que puedan revisar eventos. Cada persona recibirá una contraseña temporal.</p>
+          </div>
+          <button className="primary-glass-btn" onClick={() => c.go('users')}>Crear cuentas</button>
+          <button className="glass-btn sm" onClick={() => setPrimerosPasosVisto(true)}>Ahora no</button>
+        </Glass>
+      )}
 
       {/* Fila de 4 KPI Cards estilo Glasssy V5 con Sparklines */}
       <div className="v5-kpi-grid">

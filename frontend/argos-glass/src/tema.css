@@ -1,0 +1,147 @@
+/* ==========================================================================
+   Temas y movimiento — se carga después de index.css (main.tsx) y manda sobre él.
+
+   · Página de inicio y acceso: identidad fija (noche, foto de la carretera en <body>). No dependen del tema.
+   · Panel: <div class="v5-panel" data-theme="dark|light">. El tema SOLO existe dentro de ese contenedor.
+     Oscuro = las variables base de index.css. Claro = las variables y ajustes de este archivo.
+   · Movimiento: solo comunica algo (presionar, entrar a una página, un dato en vivo). Nada rebota.
+   ========================================================================== */
+
+/* ---------------- Fondo propio del panel: la vía de noche, en abstracto ---------------- */
+.v5-panel-fondo {
+  position: fixed; inset: 0; z-index: -1; pointer-events: none; overflow: hidden;
+  background:
+    radial-gradient(70% 55% at 0% -5%, rgba(103, 232, 249, 0.13), transparent 62%),
+    radial-gradient(55% 45% at 100% 105%, rgba(251, 191, 36, 0.09), transparent 60%),
+    linear-gradient(160deg, #050b18 0%, #08132a 50%, #0b1832 100%);
+}
+/* Estelas de luz difusas en diagonal (cian y ámbar, como en la página de inicio) */
+.v5-panel-fondo::before, .v5-panel-fondo::after {
+  content: ''; position: absolute; left: -25%; right: -25%; border-radius: 999px; filter: blur(48px);
+}
+.v5-panel-fondo::before {
+  top: 54%; height: 150px; transform: rotate(-11deg);
+  background: linear-gradient(90deg, transparent 0%, rgba(103, 232, 249, 0.20) 30%, rgba(103, 232, 249, 0.06) 65%, transparent 100%);
+}
+.v5-panel-fondo::after {
+  top: 70%; height: 110px; transform: rotate(-7deg);
+  background: linear-gradient(90deg, transparent 10%, rgba(251, 191, 36, 0.05) 40%, rgba(248, 113, 113, 0.13) 75%, transparent 100%);
+}
+
+/* Modo claro: "amanecer en la vía" */
+.v5-panel[data-theme='light'] .v5-panel-fondo {
+  background:
+    radial-gradient(70% 55% at 0% -5%, rgba(14, 116, 144, 0.10), transparent 62%),
+    radial-gradient(55% 45% at 100% 105%, rgba(217, 119, 6, 0.08), transparent 60%),
+    linear-gradient(160deg, #f4f7fb 0%, #e9eff6 50%, #dfe7f0 100%);
+}
+.v5-panel[data-theme='light'] .v5-panel-fondo::before {
+  background: linear-gradient(90deg, transparent 0%, rgba(14, 116, 144, 0.13) 30%, rgba(14, 116, 144, 0.04) 65%, transparent 100%);
+}
+.v5-panel[data-theme='light'] .v5-panel-fondo::after {
+  background: linear-gradient(90deg, transparent 10%, rgba(217, 119, 6, 0.05) 40%, rgba(225, 29, 72, 0.07) 75%, transparent 100%);
+}
+
+/* ---------------- Modo claro del panel: variables ---------------- */
+.v5-panel[data-theme='light'] {
+  color-scheme: light;
+  color: #0f172a;
+  --text-main: #0f172a;
+  --text-sub: #334155;
+  --text-muted: #5b6b80;
+  --accent: #0e7490;
+  --accent-rgb: 14, 116, 144;
+  --accent-warm: #b45309;
+  --card-bg: linear-gradient(145deg, rgba(255, 255, 255, 0.82), rgba(255, 255, 255, 0.62));
+  --card-border: rgba(15, 23, 42, 0.09);
+  --card-blur: blur(20px) saturate(140%);
+  --card-shadow: 0 14px 34px -16px rgba(15, 23, 42, 0.22), inset 0 1px 0 rgba(255, 255, 255, 0.9);
+  --card-hover-shadow: 0 18px 40px -16px rgba(15, 23, 42, 0.28), inset 0 1px 0 #fff;
+  --pill-bg: rgba(15, 23, 42, 0.05);
+  --btn-glass-bg: rgba(255, 255, 255, 0.8);
+  --input-glass-bg: rgba(255, 255, 255, 0.85);
+  --table-hover: rgba(14, 116, 144, 0.05);
+  --divider: rgba(15, 23, 42, 0.09);
+}
+
+/* Superficies de vidrio: blanco esmerilado sobre la neblina */
+.v5-panel[data-theme='light'] :is(.glass-card, .v5-sidebar, .v5-topbar) {
+  background: var(--card-bg);
+  border-color: var(--card-border);
+  box-shadow: var(--card-shadow);
+}
+.v5-panel[data-theme='light'] :is(.glass-card, .v5-sidebar, .v5-topbar)::before {
+  background: linear-gradient(135deg, rgba(255, 255, 255, 0.6), transparent 45%);
+}
+.v5-panel[data-theme='light'] :is(.control-point-status, .time-pill, .profile-chip, .icon-action-btn, .collapse-btn, .topbar-search input) {
+  background: rgba(255, 255, 255, 0.78);
+  border-color: rgba(15, 23, 42, 0.1);
+  box-shadow: 0 4px 12px -8px rgba(15, 23, 42, 0.25);
+  color: var(--text-main);
+}
+.v5-panel[data-theme='light'] :is(.icon-action-btn, .profile-chip, .collapse-btn):hover { background: #fff; color: var(--text-main); }
+.v5-panel[data-theme='light'] .topbar-search input::placeholder { color: rgba(15, 23, 42, 0.45); }
+
+.v5-panel[data-theme='light'] .v5-nav-btn:hover {
+  background: rgba(14, 116, 144, 0.07); color: var(--text-main);
+  border-color: rgba(14, 116, 144, 0.18); box-shadow: none;
+}
+.v5-panel[data-theme='light'] .v5-nav-btn.active {
+  background: rgba(255, 255, 255, 0.95); color: var(--text-main);
+  border-color: rgba(14, 116, 144, 0.3); box-shadow: 0 6px 16px -10px rgba(15, 23, 42, 0.35);
+}
+.v5-panel[data-theme='light'] .v5-nav-btn.active .nav-icon svg { stroke: var(--accent); }
+.v5-panel[data-theme='light'] .brand-text { color: var(--text-main); -webkit-text-fill-color: var(--text-main); }
+
+.v5-panel[data-theme='light'] :is(.profile-menu, .usr-clave-modal, .v5-modal) {
+  background: rgba(255, 255, 255, 0.97);
+  border-color: rgba(15, 23, 42, 0.1);
+  box-shadow: 0 24px 60px -20px rgba(15, 23, 42, 0.35);
+}
+.v5-panel[data-theme='light'] .v5-modal-backdrop { background: rgba(15, 23, 42, 0.35); }
+.v5-panel[data-theme='light'] .v5-toast { background: #fff; color: var(--text-main); border-color: rgba(15, 23, 42, 0.1); }
+.v5-panel[data-theme='light'] :is(.usr-form select option, .glass-table select option) { background: #fff; color: #0f172a; }
+
+/* ---------------- Movimiento ---------------- */
+
+/* Al entrar a una página, el contenido aparece una sola vez (no se repite ni rebota) */
+@keyframes v5Entrada { from { opacity: 0; transform: translateY(4px); } to { opacity: 1; transform: none; } }
+.v5-page-container { animation: v5Entrada 0.22s ease-out both; }
+
+/* El latido queda solo donde hay un dato en vivo: la conexión con el servidor */
+.live-dot-pulse { animation: none; }
+.control-point-status .live-dot-pulse { animation: pulseDot 2.6s ease-in-out infinite; }
+
+/* Botones: respuesta inmediata al presionar */
+:is(.glass-btn, .primary-glass-btn, .login-submit-btn, .icon-action-btn, .row-action-btn) { transition-duration: 0.15s; }
+.login-submit-btn:active:not(:disabled) { transform: scale(0.98); }
+
+/* "Reducir movimiento" del sistema: sin animaciones ni transiciones de desplazamiento */
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: 0.01ms !important; animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important; scroll-behavior: auto !important;
+  }
+}
+
+/* ---------------- Saludo del dashboard ---------------- */
+.dash-ultimo-acceso { color: var(--text-muted); }
+.dash-primeros-pasos {
+  display: flex; align-items: center; gap: 16px; padding: 18px 22px; margin-bottom: 22px;
+  border-color: rgba(var(--accent-rgb), 0.35);
+}
+.dash-primeros-pasos > div { flex: 1; }
+.dash-primeros-pasos b { font-size: 15px; }
+.dash-primeros-pasos p { font-size: 13px; color: var(--text-sub); margin-top: 2px; }
+.dash-pp-icono {
+  width: 40px; height: 40px; border-radius: 12px; flex-shrink: 0; display: grid; place-items: center;
+  background: rgba(var(--accent-rgb), 0.14); color: var(--accent);
+}
+.dash-pp-icono .icon-svg { width: 20px; height: 20px; }
+@media (max-width: 720px) { .dash-primeros-pasos { flex-wrap: wrap; } }
+
+/* Cambio de tema instantáneo (App.tsx añade esta clase un instante) */
+.v5-sin-transicion, .v5-sin-transicion *, .v5-sin-transicion *::before, .v5-sin-transicion *::after { transition: none !important; }
+
+/* Barras de desplazamiento discretas en ambos temas */
+.v5-panel { scrollbar-color: rgba(148, 163, 184, 0.45) transparent; }

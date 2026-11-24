@@ -51,7 +51,12 @@ export default function App() {
   const [now, setNow] = useState(() => new Date());
   const [menuOpen, setMenuOpen] = useState(false);
   const [collapsed, setCollapsed] = useState(() => leer('argos-sidebar') === '1');
-  const [theme, setTheme] = useState<Theme>(() => (leer('argos-theme') as Theme) || 'light');
+  // Tema del panel (no afecta a la página de inicio ni al acceso). Sin elección guardada: el del sistema.
+  const [theme, setTheme] = useState<Theme>(() => {
+    const guardado = leer('argos-tema-panel');
+    if (guardado === 'light' || guardado === 'dark') return guardado;
+    return window.matchMedia?.('(prefers-color-scheme: light)').matches ? 'light' : 'dark';
+  });
 
   // Orden: por defecto el del backend (prioridad D2); el usuario puede ordenar por velocidad.
   const events = useMemo(
@@ -173,8 +178,7 @@ export default function App() {
   }, [collapsed]);
 
   useEffect(() => {
-    document.documentElement.dataset.theme = theme;
-    guardar('argos-theme', theme);
+    guardar('argos-tema-panel', theme);
   }, [theme]);
 
   const openEvent = useCallback((id: string) => {
@@ -183,22 +187,11 @@ export default function App() {
     go('detail');
   }, [go]);
 
-  const bg = (
-    <div className="v5-bg" aria-hidden>
-      <div className="v5-orb orb-1" />
-      <div className="v5-orb orb-2" />
-      <div className="v5-orb orb-3" />
-      <div className="v5-orb orb-4" />
-      <div className="v5-grid-pattern" />
-    </div>
-  );
-
   /* ---------- Páginas públicas ---------- */
 
   if (page === 'landing') {
     return (
       <>
-        {bg}
         <Landing onEnter={() => go(user ? 'dash' : 'login')} />
         <Toasts list={toasts} />
       </>
@@ -206,7 +199,7 @@ export default function App() {
   }
 
   if (user === undefined) {
-    return <>{bg}<div className="v5-auth-check" role="status">Comprobando sesión…</div></>;
+    return <><div className="v5-auth-check" role="status">Comprobando sesión…</div></>;
   }
 
   if (!user || page === 'login') {
@@ -216,7 +209,6 @@ export default function App() {
     }
     return (
       <>
-        {bg}
         <Login onSesion={entrar} onBack={() => go('landing')} aviso={aviso} />
         <Toasts list={toasts} />
       </>
@@ -227,7 +219,6 @@ export default function App() {
   if (user.debe_cambiar) {
     return (
       <>
-        {bg}
         <div className="v5-cuenta-layout">
           <CambioContrasena
             user={user} obligatorio
@@ -324,12 +315,12 @@ export default function App() {
     reports: () => <Reports c={ctx} />,
     device: () => <Devices c={ctx} />,
     settings: () => <Settings c={ctx} />,
-    users: () => <Users yo={user} toast={toast} />,
+    users: () => <Users yo={user} toast={toast} onMiNombre={(nombre) => setUser({ ...user, nombre })} />,
   };
 
   return (
-    <>
-      {bg}
+    <div className="v5-panel" data-theme={theme}>
+      <div className="v5-panel-fondo" aria-hidden />
       <div className={`v5-layout ${collapsed ? 'sidebar-collapsed' : ''}`}>
         <aside className={`v5-sidebar ${menuOpen ? 'open' : ''}`}>
           <div className="sidebar-brand">
@@ -425,7 +416,13 @@ export default function App() {
                 className="icon-action-btn"
                 aria-label="Cambiar tema"
                 title={theme === 'dark' ? 'Modo Claro' : 'Modo Oscuro'}
-                onClick={() => setTheme(theme === 'dark' ? 'light' : 'dark')}
+                onClick={() => {
+                  // Cambio instantáneo: sin esto cada elemento transiciona por su cuenta y el panel "destiñe"
+                  const panel = document.querySelector('.v5-panel');
+                  panel?.classList.add('v5-sin-transicion');
+                  setTheme(theme === 'dark' ? 'light' : 'dark');
+                  setTimeout(() => panel?.classList.remove('v5-sin-transicion'), 50);
+                }}
               >
                 {theme === 'dark' ? '☀' : '☾'}
               </button>
@@ -497,7 +494,7 @@ export default function App() {
       )}
 
       <Toasts list={toasts} />
-    </>
+    </div>
   );
 }
 

@@ -35,6 +35,7 @@ class Actor:
     rol: str
     email: str | None = None
     debe_cambiar: bool = False   # contraseña temporal: solo puede cambiarla o cerrar sesión
+    acceso_anterior: datetime | None = None   # ingreso previo a esta sesión (None = primer ingreso)
 
     @property
     def etiqueta(self) -> str:
@@ -72,7 +73,7 @@ def _actor_sesion(request: Request, token: str) -> Actor:
     ahora = datetime.now(timezone.utc)
     with transaccion() as conn:
         s = conn.execute(
-            """SELECT a.id, a.creada_en, a.ultima_actividad,
+            """SELECT a.id, a.creada_en, a.ultima_actividad, a.acceso_anterior,
                       u.id AS uid, u.nombre, u.email, u.rol, u.activo, u.debe_cambiar_contrasena
                FROM sesiones_acceso a JOIN usuarios u ON u.id = a.usuario_id
                WHERE a.token_hash = %s AND a.cerrada_en IS NULL""",
@@ -99,7 +100,8 @@ def _actor_sesion(request: Request, token: str) -> Actor:
     # Fuera de la transacción: si se lanzara dentro, se revertiría el cierre y su auditoría.
     if motivo:
         raise HTTPException(401, f"Sesión expirada: {motivo.lower()}")
-    return Actor("usuario", s["uid"], s["nombre"], s["rol"], s["email"], s["debe_cambiar_contrasena"])
+    return Actor("usuario", s["uid"], s["nombre"], s["rol"], s["email"], s["debe_cambiar_contrasena"],
+                 s["acceso_anterior"])
 
 
 def _verificar_origen(request: Request) -> None:
@@ -138,11 +140,11 @@ def requiere(*roles: str, tipo: str | None = None):
 
 # ---------------------------------------------------------------- sesiones
 
-def abrir_sesion(conn, usuario_id: int, response: Response) -> None:
+def abrir_sesion(conn, usuario_id: int, response: Response, acceso_anterior: datetime | None = None) -> None:
     token = secrets.token_urlsafe(32)
     conn.execute(
-        "INSERT INTO sesiones_acceso (token_hash, usuario_id) VALUES (%s, %s)",
-        (sha256(token), usuario_id),
+        "INSERT INTO sesiones_acceso (token_hash, usuario_id, acceso_anterior) VALUES (%s, %s, %s)",
+        (sha256(token), usuario_id, acceso_anterior),
     )
     response.set_cookie(
         COOKIE, token,

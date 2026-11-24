@@ -35,3 +35,19 @@
 .usr-credencial dd { font-size: 14px; font-weight: 600; word-break: break-all; }
 .usr-clave { font-family: var(--mono); font-size: 18px !important; letter-spacing: 1px; user-select: all; }
 .usr-modal-acciones { display: flex; justify-content: flex-end; gap: 10px; margin-top: 20px; }
+
+.usr-editar {
+  border: 0; background: transparent; cursor: pointer; margin-left: 6px; padding: 3px; border-radius: 6px;
+  color: var(--text-muted); vertical-align: middle; opacity: 0.7; transition: opacity 0.15s, color 0.15s;
+}
+.usr-editar:hover, .usr-editar:focus-visible { opacity: 1; color: var(--accent); outline: none; }
+.usr-editar .icon-svg { width: 14px; height: 14px; }
+.usr-nombre-edit { display: flex; gap: 6px; align-items: center; }
+.usr-nombre-edit input {
+  min-width: 0; flex: 1; padding: 7px 10px; border-radius: 10px; font-size: 13px;
+  background: var(--input-glass-bg); color: var(--text-main); border: 1px solid rgba(var(--accent-rgb), 0.6); outline: none;
+}
+
+/* Matriz de roles: el texto se ajusta en lugar de cortarse */
+.usr-matriz td, .usr-matriz th { white-space: normal; }
+.usr-matriz td:first-child, .usr-matriz td:last-child { white-space: nowrap; }
