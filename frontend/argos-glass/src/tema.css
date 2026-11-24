@@ -151,3 +151,13 @@
 .speed-pill.normal { color: #6ee7b7; background: rgba(16, 185, 129, 0.14); border-color: rgba(52, 211, 153, 0.35); }
 .v5-panel[data-theme='light'] .speed-pill.excess { color: #b91c1c; background: rgba(239, 68, 68, 0.1); border-color: rgba(239, 68, 68, 0.3); }
 .v5-panel[data-theme='light'] .speed-pill.normal { color: #047857; background: rgba(16, 185, 129, 0.1); border-color: rgba(16, 185, 129, 0.3); }
+
+/* Velocímetro: resplandor que se desvanece por completo (antes un rectángulo SVG con bordes visibles) */
+.gauge-dial::before {
+  content: ''; position: absolute; inset: -10% -15% -20%; pointer-events: none; z-index: 0;
+  background: radial-gradient(closest-side at 50% 78%, rgba(59, 130, 246, 0.2), rgba(59, 130, 246, 0));
+  transition: background 0.3s ease-out;
+}
+.gauge-box.over .gauge-dial::before { background: radial-gradient(closest-side at 50% 78%, rgba(239, 68, 68, 0.22), rgba(239, 68, 68, 0)); }
+.gauge-dial > svg, .gauge-dial > .g-center { position: relative; z-index: 1; }
+.gauge-dial > .g-center { position: absolute; }

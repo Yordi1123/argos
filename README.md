@@ -29,6 +29,8 @@ placa candidata para que **una persona autorizada tome la decisión final**.
 | `vision` | Python 3.12 + YOLOv11s + RapidOCR | Detección de placas peruanas desde la cola (`EN_COLA`) y prueba en memoria | solo red interna |
 | `frontend` | React + TypeScript + nginx | Panel de revisión humana | 127.0.0.1:8080 |
 
+Cómo funciona la detección de placas (YOLOv11s + OCR) y su pipeline completo: [`docs/vision.md`](docs/vision.md).
+
 **¿Por qué el agente de captura no está en Docker?** Necesita el puerto USB serial del ESP32
 y baja latencia con la cámara. Docker Desktop en Windows y macOS no expone dispositivos USB a
 los contenedores. El agente corre directamente en la laptop, guarda la foto en

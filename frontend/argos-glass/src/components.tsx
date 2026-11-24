@@ -296,7 +296,7 @@ export function ModernAreaChart() {
 }
 
 /** Velocímetro estilo Glasssy Dashboard V5 */
-export function Gauge({ speed = 58, limit = LIMIT }: { speed?: number; limit?: number }) {
+export function Gauge({ speed = 58, limit = LIMIT, valor }: { speed?: number; limit?: number; valor?: ReactNode }) {
   const max = Math.max(80, limit * 2);
   const k = Math.min(1, Math.max(0, speed / max));
   const arcLength = Math.PI * 96;
@@ -312,13 +312,8 @@ export function Gauge({ speed = 58, limit = LIMIT }: { speed?: number; limit?: n
               <stop offset="50%" stopColor="#f59e0b" />
               <stop offset="100%" stopColor="#ef4444" />
             </linearGradient>
-            <radialGradient id="gaugeCenterGlow" cx="0.5" cy="0.9" r="0.8">
-              <stop offset="0%" stopColor={isOver ? 'rgba(239, 68, 68, 0.25)' : 'rgba(59, 130, 246, 0.2)'} />
-              <stop offset="100%" stopColor="transparent" />
-            </radialGradient>
           </defs>
 
-          <rect width="240" height="145" fill="url(#gaugeCenterGlow)" />
           <path d="M24 130 A 96 96 0 0 1 216 130" fill="none" stroke="rgba(148, 163, 184, 0.16)" strokeWidth="14" strokeLinecap="round" />
           <path
             d="M24 130 A 96 96 0 0 1 216 130"
@@ -333,7 +328,7 @@ export function Gauge({ speed = 58, limit = LIMIT }: { speed?: number; limit?: n
         </svg>
 
         <div className="g-center">
-          <span className="g-val-num">{speed}</span>
+          <span className="g-val-num">{valor ?? speed}</span>
           <span className="g-unit">km/h</span>
         </div>
       </div>

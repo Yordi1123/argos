@@ -4,6 +4,8 @@ import { puede, REVISABLES, type Auditoria, type EventoDetalle, type Sesion } fr
 import { cuandoFue, resumenParaRol, tituloSaludo } from './saludo';
 import { AuditTimeline, Badge, Bars, Camera, EventTable, Gauge, Glass, Heading, Icon, ModernAreaChart, PlateTag, Road, Sparkline, TrendPill } from './components';
 import { PanelVision } from './vision';
+import { CamaraEnVivo, HistorialLecturas } from './monitor';
+import { hhmmss, useRadarEnVivo, useVelocidadAnimada } from './radar';
 
 export interface Ctx {
   events: TrafficEvent[];
@@ -506,16 +508,17 @@ export function DeteccionPlacas({ c }: { c: Ctx }) {
 /* ---------------- Monitor en Vivo ---------------- */
 export function Monitor({ c }: { c: Ctx }) {
   const ev = c.events[c.selected] ?? c.events[0];
-  if (!ev) {
-    return <NoEvents c={c} title="Monitoreo en Tiempo Real" />;
-  }
-  const d = c.detail?.id === ev.id ? c.detail : null;
-  const ultimo = d?.analisis.filter((a) => !a.error).at(-1);
+  const d = ev && c.detail?.id === ev.id ? c.detail : null;
+  const limite = ev?.limit ?? LIMIT;
+  const distancia = d ? Number(d.distancia_m) : 3;
+  const radar = useRadarEnVivo(limite, distancia, !c.paused);
+  const velocidad = useVelocidadAnimada(radar.velocidad);
+  const exceso = radar.velocidad - limite;
   return (
     <>
       <Heading
         title="Monitoreo en Tiempo Real"
-        sub="Punto de control 01 · Av. Pacífico, UPIS Belén · Telemetría óptica activa"
+        sub="Punto de control 01 · Av. Pacífico, UPIS Belén"
         actions={<>
           <button className="glass-btn sm" id="btn-ir-deteccion" onClick={() => c.go('detect')}>Probar detección de placas</button>
           <span className="badge-pill valid"><span className="b-dot" />Radar Operativo</span>
@@ -529,35 +532,40 @@ export function Monitor({ c }: { c: Ctx }) {
               {c.paused ? 'Reanudar' : 'Congelar'}
             </button>
           </div>
-          <Camera ev={ev} frame={c.frame} />
+          <CamaraEnVivo pausado={c.paused} lectura={radar} limite={limite} />
           <div className="statlist">
             <div><small>MODO DE CAPTURA</small><b>Buffer Circular · 30 FPS</b></div>
-            <div><small>INFERENCIA DE VISIÓN</small><b>{ultimo?.modelo_version ?? ev.modelVersion ?? 'En cola'}</b></div>
+            <div><small>INFERENCIA DE VISIÓN</small><b>YOLOv11s + OCR</b></div>
           </div>
         </Glass>
 
-        <Glass>
+        <Glass className="mon-radar">
           <div className="card-top-row">
             <h2>Lectura de Radar</h2>
-            <span className="tag-pill">{ev.time}</span>
+            <span className="tag-pill mon-reloj">{hhmmss(radar.hora)}</span>
           </div>
 
-          <Gauge speed={ev.speed} limit={ev.limit} />
+          <Gauge speed={radar.velocidad} limit={limite} valor={velocidad} />
 
-          <div style={{ textAlign: 'center', margin: '14px 0' }}>
-            <span className="badge-pill alert">{(ev.speed - ev.limit).toFixed(1)} km/h sobre el límite permitido</span>
+          <div className="mon-estado" key={radar.n}>
+            {exceso > 0
+              ? <span className="badge-pill alert">+{exceso.toFixed(1)} km/h sobre el límite</span>
+              : <span className="badge-pill valid"><span className="b-dot" />Dentro del límite</span>}
           </div>
 
           <div className="statlist">
-            <div><small>Límite Vial</small><b>{ev.limit} km/h</b></div>
-            <div><small>Distancia Barreras</small><b>{d ? `${Number(d.distancia_m).toFixed(2)} m` : '—'}</b></div>
-            <div><small>Placa Detectada</small><b>{ev.plate}</b></div>
+            <div><small>Límite Vial</small><b>{limite} km/h</b></div>
+            <div><small>Distancia Barreras</small><b>{distancia.toFixed(2)} m</b></div>
+            <div><small>Vehículos medidos</small><b>{radar.n}</b></div>
             <div><small>Sensor ESP32</small><b className="tick">Sincronizado</b></div>
           </div>
 
+          <div className="mon-historial-cab"><small>ÚLTIMAS LECTURAS</small><small>límite {limite} km/h</small></div>
+          <HistorialLecturas valores={radar.historial} limite={limite} />
+
           <hr />
-          <div className="checkrow"><span>Barrera Fotoeléctrica 1</span><span className="tick">● Activa</span></div>
-          <div className="checkrow"><span>Barrera Fotoeléctrica 2</span><span className="tick">● Activa</span></div>
+          <div className="checkrow"><span>Barrera Fotoeléctrica 1</span><span className={`mon-barrera ${radar.barrera === 1 ? 'corte' : ''}`}>{radar.barrera === 1 ? '● Corte' : '● Activa'}</span></div>
+          <div className="checkrow"><span>Barrera Fotoeléctrica 2</span><span className={`mon-barrera ${radar.barrera === 2 ? 'corte' : ''}`}>{radar.barrera === 2 ? '● Corte' : '● Activa'}</span></div>
           <div className="checkrow"><span>Cámara IP CAM-01</span><span className="tick">● 1080p 30fps</span></div>
           <div className="checkrow"><span>Condiciones de Vía</span><span className="tick">Seca · Iluminada</span></div>
         </Glass>

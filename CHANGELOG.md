@@ -13,6 +13,7 @@ Secciones por versión: **Agregado**, **Cambiado**, **Obsoleto**, **Eliminado**,
 - Módulo de visión real (`vision/`) con **YOLOv11s** (`yolov11s_placas.pt`, entrenado en Google Colab a 800×800 sobre placas peruanas) + **OCR offline** (`rapidocr-onnxruntime`), integrado como cuarto servicio en Docker Compose.
 - Endpoints `/api/vision/estado` y `/api/vision/detectar` en el backend y tarjeta interactiva en *Monitoreo en tiempo real* para verificar el estado del modelo YOLOv11s y probar la detección de placas en memoria desde el navegador.
 - Panel: sección propia **Detección de placas** en el menú (acceso también desde *Monitoreo en tiempo real*): se sube o arrastra la foto de un vehículo y YOLOv11s + OCR intenta detectar y leer la placa, sin crear eventos ni guardar la imagen.
+- Monitoreo en tiempo real: video de la cámara del punto de control en la sección *Cámara óptica* (reloj REC y lectura del radar sobre la imagen) y lecturas del radar en vivo de demostración: corte de barrera 1 → barrera 2 → velocímetro que se desplaza hasta la nueva velocidad, estado dentro/sobre el límite, contador de vehículos y barras de las últimas lecturas. *Congelar* pausa video y lecturas.
 - Detección de placas: animaciones que informan el proceso (barrido de escaneo mientras el modelo trabaja, marco que se cierra sobre la placa encontrada, lectura de la placa carácter a carácter, barras de confianza que se llenan con color según el nivel, esqueleto de carga y resultado que aparece por partes). Respetan "reducir movimiento".
 - Parámetro `--foto` en `agente/simulador.py` para encolar eventos con fotografías reales hacia el servicio `vision`.
 - Panel: saludo según la hora de Lima con el nombre de la persona, resumen real según su rol y "último ingreso" como aviso de seguridad; bienvenida y primeros pasos en el primer ingreso de un administrador.
@@ -43,6 +44,8 @@ Secciones por versión: **Agregado**, **Cambiado**, **Obsoleto**, **Eliminado**,
 - Usuarios de demostración `@argos.local`: los que firmaron dictámenes quedan desactivados.
 
 ### Corregido
+- Velocímetro: el resplandor dejaba un rectángulo con bordes visibles (sobre todo en modo claro); ahora se desvanece por completo.
+- Detección de placas: las fotos de más de ~750 KB fallaban con 413 porque nginx limita las peticiones a 1 MB; `/api/vision/detectar` ahora acepta hasta 15 MB.
 - Servicio `vision` no arrancaba (`libxcb.so.1`): ultralytics instalaba OpenCV con interfaz gráfica; ahora la imagen usa solo la versión headless. Además, ya no publica el puerto 8001: su `/detectar` no tiene autenticación y solo se usa a través del backend.
 - La tarjeta de pruebas de visión aparecía también dentro del detalle de un evento; queda solo en *Monitoreo en tiempo real*.
 - La velocidad en la tabla de eventos casi no se leía en modo oscuro (rojo oscuro sobre vidrio oscuro); ahora usa un tono para cada tema.

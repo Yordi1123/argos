@@ -196,6 +196,9 @@ a datos reales o elimínalo:
 - Dispositivos: toda la página (IP, firmware, latencias y uptime de ejemplo).
 - Configuración: valores de calibración fijos, "Certificado INACAL", "12.8 GB", "Cifrado AES-256" (no existe
   cifrado en reposo).
-- Monitor y tablas: "YOLOv8", "CAM-01", "30 FPS", "1080p" fijos en el código.
+- Monitoreo en tiempo real (decisión del equipo para demostraciones, sin rótulo en la UI): el video
+  `public/monitoreo.mp4` es una grabación en bucle y las lecturas del radar, cortes de barrera y "Vehículos
+  medidos" se generan en el navegador (`src/radar.ts`). Reemplazar por la telemetría del agente real.
+  "CAM-01", "30 FPS", "1080p" siguen fijos en el código.
 - `index.css` importa Google Fonts: sin internet cae a la fuente del sistema. Debe servirse localmente.
 - `public/forest-bg.jpg` ya no se usa.
