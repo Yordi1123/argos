@@ -1165,6 +1165,9 @@ export function Users({ c }: { c: Ctx }) {
 export function Login({ c }: { c: Ctx }) {
   return (
     <div className="v5-login-layout">
+      <button className="glass-btn sm login-back-btn" onClick={() => c.go('landing')}>
+        ← Volver al inicio
+      </button>
       <div className="login-visual-panel">
         <div className="login-brand-suite">
           <div className="brand-badge-icon large">

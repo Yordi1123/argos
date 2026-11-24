@@ -3,6 +3,7 @@ import { menus, type Page, type TrafficEvent } from './data';
 import { api, aEvento, REVISABLES, type Decision, type EventoDetalle, type Usuario } from './api';
 import { useInterval } from './hooks';
 import { Icon } from './components';
+import { Landing } from './landing';
 import { Dashboard, Detail, Devices, EventsPage, Evidence, Login, Monitor, Reports, Settings, Users, type Ctx } from './pages';
 
 type Theme = 'light' | 'dark';
@@ -25,7 +26,7 @@ function guardar(clave: string, valor: string) {
 }
 
 export default function App() {
-  const [page, setPage] = useState<Page>('dash');
+  const [page, setPage] = useState<Page>('landing');
   const [raw, setRaw] = useState<TrafficEvent[]>([]);
   const [loaded, setLoaded] = useState(false);
   const [online, setOnline] = useState(true);
@@ -206,6 +207,15 @@ export default function App() {
       <div className="v5-grid-pattern" />
     </div>
   );
+
+  if (page === 'landing') {
+    return (
+      <>
+        {bg}
+        <Landing onEnter={() => go('login')} />
+      </>
+    );
+  }
 
   if (page === 'login') {
     return (

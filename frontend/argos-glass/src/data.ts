@@ -30,7 +30,7 @@ export interface TrafficEvent {
 }
 
 export type Page =
-  | 'login' | 'dash' | 'monitor' | 'events' | 'image' | 'review'
+  | 'landing' | 'login' | 'dash' | 'monitor' | 'events' | 'image' | 'review'
   | 'reports' | 'device' | 'settings' | 'users' | 'detail';
 
 /** Límite por defecto para gráficos decorativos; cada evento trae el de su sesión. */
