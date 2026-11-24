@@ -9,6 +9,38 @@ Secciones por versión: **Agregado**, **Cambiado**, **Obsoleto**, **Eliminado**,
 
 ## [Sin publicar]
 
+### Agregado
+- Inicio de sesión con correo y contraseña. Las contraseñas se guardan solo como hash Argon2id.
+- Cuentas creadas por un administrador con contraseña temporal (se muestra una vez) que se cambia obligatoriamente en el primer ingreso.
+- Bloqueo de 15 min tras 5 intentos fallidos; el mensaje de error no revela si la cuenta existe.
+- "Restablecer contraseña" en la administración de cuentas y "Cambiar contraseña" en el menú del perfil.
+- Consola de cuentas: `python -m app.cuentas admin|restablecer|listar` para el primer administrador o emergencias.
+- Sesiones del panel en el servidor con cookie `HttpOnly`/`SameSite=Strict`: 8 h máximo y cierre tras 30 min sin actividad; el sondeo automático no cuenta como actividad.
+- Página real de administración de cuentas: crear, cambiar rol, desactivar y reactivar. Siempre queda al menos un administrador activo.
+- Claves de API para servicios (`python -m app.claves crear|listar|rotar|revocar`).
+- Menú y acciones según el rol (REVISOR, OPERADOR, ADMINISTRADOR), menú de perfil y cierre de sesión.
+- Auditoría de ingresos, accesos denegados, cambios de contraseña y cambios de cuentas.
+- Inicio de sesión con Google preparado como implementación futura: el panel muestra el botón como "Próximamente" mientras no haya `GOOGLE_CLIENT_ID`.
+
+### Cambiado
+- **Rompe la API:** `POST /api/eventos/{id}/revision` ya no acepta `revisor_id`; el revisor es quien tiene la sesión abierta.
+- **Rompe la API:** se elimina el encabezado `X-Actor`; el agente y el módulo de visión deben enviar `X-Api-Key`.
+- **Rompe la API:** `POST /api/sesiones` ya no acepta `operador_id`; se toma de la sesión.
+- **Rompe la API:** `GET/POST /api/usuarios` requieren rol ADMINISTRADOR; crear exige `nombre` y devuelve `contrasena_temporal`.
+- La pantalla de acceso tiene un formulario real en lugar de campos ilustrativos.
+- `agente/simulador.py` lee `ARGOS_CLAVE_AGENTE` y `ARGOS_CLAVE_VISION`.
+
+### Eliminado
+- Usuarios de demostración `@argos.local`: los que firmaron dictámenes quedan desactivados.
+
+### Corregido
+- Un dictamen sobre un evento inexistente respondía 500; ahora 404. Un identificador mal formado responde 422.
+
+### Seguridad
+- Todos los endpoints de eventos, evidencias, cola y análisis exigen autenticación; antes eran públicos, incluidas las fotos de evidencia.
+- Cada clave de servicio solo puede hacer lo suyo: el agente no lee eventos ni emite dictámenes, y la visión no registra eventos.
+- Las escrituras con cookie se rechazan si vienen de un origen distinto al panel (defensa CSRF además de `SameSite`).
+
 ## [1.0.0-alpha.1] - 2026-11-23
 
 Primera versión alpha: el flujo completo funciona con el simulador, sin hardware real.

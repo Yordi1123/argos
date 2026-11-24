@@ -38,22 +38,85 @@ los contenedores. El agente corre directamente en la laptop, guarda la foto en
 Requisitos: Docker Desktop (o Docker Engine + Compose v2) y Python 3.10+ para el agente.
 
 ```bash
-cp .env.example .env          # y cambiar POSTGRES_PASSWORD
+cp .env.example .env          # cambiar POSTGRES_PASSWORD
 docker compose up -d --build
 docker compose ps             # los tres servicios deben estar "healthy"/"running"
+
+# Primer administrador (una sola vez): imprime una contraseña temporal que se cambia al ingresar
+docker compose exec backend python -m app.cuentas admin tu@gmail.com "Nombre Apellido"
+
+# Claves de los servicios (una sola vez): copia cada línea ARGOS_CLAVE_... que se imprime a tu .env
+docker compose exec backend python -m app.claves crear agente OPERADOR
+docker compose exec backend python -m app.claves crear vision VALIDACION_IA
 ```
 
-- Panel: http://localhost:8080
+- Panel: http://localhost:8080 (ingresa con el correo y la contraseña temporal del paso anterior)
 - Documentación interactiva de la API: http://localhost:8000/docs
 
 ### Probar sin hardware
 
 ```bash
-python agente/simulador.py --eventos 8 --analizar
+python agente/simulador.py --eventos 8 --analizar   # usa ARGOS_CLAVE_AGENTE y ARGOS_CLAVE_VISION del .env
 ```
 
 Crea una sesión, genera fotos sintéticas, registra los eventos y simula el módulo de visión.
 Los eventos aparecen en el panel en la pestaña **Por revisar**.
+
+## Inicio de sesión y claves
+
+Las personas entran con **correo y contraseña** de una cuenta que creó un administrador en
+*Administración de usuarios*. Los servicios (agente de captura, módulo de visión) usan una clave de API cada uno.
+
+| Quién | Cómo se autentica | Qué puede hacer |
+| --- | --- | --- |
+| `ADMINISTRADOR` | Correo + contraseña | Todo, incluida la gestión de cuentas |
+| `REVISOR` | Correo + contraseña | Ver eventos y emitir dictámenes |
+| `OPERADOR` | Correo + contraseña | Ver eventos (solo lectura), abrir y cerrar jornadas |
+| Agente de captura | `X-Api-Key` (rol `OPERADOR`) | Abrir jornadas y registrar eventos |
+| Módulo de visión | `X-Api-Key` (rol `VALIDACION_IA`) | Leer la cola y registrar análisis |
+
+- **Contraseñas:** solo se guarda su hash Argon2id. Mínimo 10 caracteres y distinta del correo.
+- **Cuentas nuevas:** el administrador las crea y ARGOS genera una contraseña temporal que se muestra **una vez**
+  y se entrega en persona. En el primer ingreso el panel exige cambiarla; hasta entonces el backend no permite nada más.
+- **Olvido o bloqueo:** tras 5 intentos fallidos la cuenta se bloquea 15 min. Un administrador puede
+  *Restablecer contraseña* (genera otra temporal, desbloquea y cierra sus sesiones).
+- **Sesión:** cookie `HttpOnly` que dura una jornada (8 h) y se cierra tras 30 min sin actividad. Cambiar el rol,
+  desactivar una cuenta o restablecer su contraseña cierra sus sesiones al instante.
+- **Firma:** quien emite un dictamen es siempre la persona con la sesión abierta; el backend ignora cualquier
+  identidad enviada en la petición.
+- **Sin acceso de administrador** (p. ej. se olvidó la única contraseña de admin):
+  `docker compose exec backend python -m app.cuentas restablecer <correo>` o `... admin <correo> "Nombre"`.
+  `python -m app.cuentas listar` muestra las cuentas.
+
+### Google (implementación futura)
+
+El panel muestra *Continuar con Google* como **próximamente**. El código ya existe (`POST /api/auth/google`):
+si algún día se completa `GOOGLE_CLIENT_ID` en `.env`, el botón se vuelve funcional para las cuentas ya creadas
+por un administrador. Pasos en Google Cloud cuando se retome:
+
+1. <https://console.cloud.google.com/> → crear proyecto → **Google Auth Platform** → *Branding* (nombre y email de soporte).
+2. *Audience* → **External** → **Publish app** (con `openid`, `email` y `profile` no exige verificación).
+3. *Clients* → **Web application** con orígenes `http://localhost`, `http://localhost:8080` y `http://localhost:5173`.
+4. Copiar el **Client ID** a `GOOGLE_CLIENT_ID` y `docker compose up -d backend`.
+
+### Claves de servicio
+
+```bash
+docker compose exec backend python -m app.claves listar
+docker compose exec backend python -m app.claves rotar agente     # nueva clave, invalida la anterior
+docker compose exec backend python -m app.claves revocar vision
+```
+
+La clave se muestra una sola vez; en la base solo queda su SHA-256.
+
+### Base de datos existente
+
+`db/init/` solo se ejecuta al crear el volumen. Para aplicar la autenticación a una base que ya tenía datos:
+
+```bash
+docker compose exec -T db psql -U argos -d argos -v ON_ERROR_STOP=1 < db/init/02_autenticacion.sql
+docker compose exec -T db psql -U argos -d argos -v ON_ERROR_STOP=1 < db/init/03_contrasenas.sql
+```
 
 ## Ciclo de vida de un evento
 
@@ -82,17 +145,22 @@ EVIDENCIA_GUARDADA → EN_COLA → ANALIZADO → EN_REVISION → CONFIRMADO | DE
 
 ## API principal
 
-| Método | Ruta | Quién la usa |
+| Método | Ruta | Quién (autenticación) |
 | --- | --- | --- |
-| `POST` | `/api/sesiones` | Operador: abre una jornada con distancia, límite y latencia calibrada |
-| `POST` | `/api/sesiones/{id}/cerrar` | Operador |
-| `POST` | `/api/eventos` | Agente de captura |
-| `GET` | `/api/cola` | Módulo de visión: eventos pendientes de analizar |
-| `POST` | `/api/eventos/{id}/analisis` | Módulo de visión: resultado o error de un intento |
-| `GET` | `/api/eventos?estado=` | Panel |
-| `GET` | `/api/eventos/{id}` | Panel: detalle, análisis, revisiones y auditoría |
-| `POST` | `/api/eventos/{id}/revision` | Revisor |
-| `GET` | `/api/evidencias/{id}/archivo` | Panel: foto verificada por hash |
+| `GET` | `/api/salud` | Público: estado y versión |
+| `POST` | `/api/auth/ingresar` | Público: correo + contraseña → sesión |
+| `POST` | `/api/auth/contrasena` | Sesión: cambiar la propia contraseña |
+| `GET` | `/api/auth/yo` · `POST` `/api/auth/salir` | Sesión |
+| `GET` · `POST` | `/api/auth/config` · `/api/auth/google` | Público · futuro: Google (503 sin `GOOGLE_CLIENT_ID`) |
+| `GET` `POST` `PATCH` | `/api/usuarios` | ADMINISTRADOR (crear devuelve la contraseña temporal) |
+| `POST` | `/api/usuarios/{id}/contrasena` | ADMINISTRADOR: restablecer contraseña |
+| `POST` | `/api/sesiones` · `/api/sesiones/{id}/cerrar` | Agente u OPERADOR/ADMINISTRADOR: jornada con distancia, límite y latencia |
+| `POST` | `/api/eventos` | Agente de captura (clave `OPERADOR`) |
+| `GET` | `/api/cola` | Módulo de visión (clave `VALIDACION_IA`) |
+| `POST` | `/api/eventos/{id}/analisis` | Módulo de visión |
+| `GET` | `/api/eventos?estado=` · `/api/eventos/{id}` | Personas con sesión (cualquier rol) |
+| `POST` | `/api/eventos/{id}/revision` | REVISOR o ADMINISTRADOR (el revisor sale de la sesión) |
+| `GET` | `/api/evidencias/{id}/archivo` | Personas con sesión: foto verificada por hash |
 
 ## Respaldo al cierre de cada sesión
 
@@ -119,10 +187,10 @@ argos/
 
 ## Pendiente antes del piloto
 
-- [ ] **Autenticación.** El panel elige al revisor de una lista (usuarios demo). Antes del
-      piloto, reemplazar por inicio de sesión (JWT o sesión) y tomar el actor del token, no de `X-Actor`.
+- [x] **Autenticación.** Correo + contraseña (Argon2id) para personas, claves de API para servicios.
+- [ ] Inicio de sesión con Google (código listo; falta configurar Google Cloud).
 - [ ] Agente de captura real: lectura serial del ESP32, buffer circular de cuadros RTSP, D1.
 - [ ] Módulo de visión real (YOLO + OCR) usando `GET /api/cola` y `POST /api/eventos/{id}/analisis`.
       Puede ser un cuarto servicio Docker: no necesita USB.
-- [ ] Cambiar los usuarios demo y la contraseña de `.env`.
+- [ ] Cambiar la contraseña de `.env` y rotar las claves de servicio en la laptop del piloto.
 - [ ] Definir el plazo de conservación de evidencias (Ley N.° 29733).

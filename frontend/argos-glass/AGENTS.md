@@ -19,7 +19,8 @@ npm run lint        # oxlint                 ← debe pasar con 0 advertencias
 ```
 
 Requiere Node ≥ 22.12 (Vite 8). El backend debe estar arriba para ver datos: desde la raíz del repo,
-`docker compose up -d` y luego `python3 agente/simulador.py --eventos 5 --analizar` para generar eventos.
+`docker compose up -d` y luego `python3 agente/simulador.py --eventos 5 --analizar` para generar eventos
+(requiere las claves de servicio en `.env`; ver README raíz → "Inicio de sesión y claves").
 
 Desplegar el frontend en Docker: `docker compose up -d --build frontend` (desde la raíz).
 
@@ -35,16 +36,45 @@ backend (FastAPI) ──JSON──► src/api.ts ──aEvento()──► Traffi
 
 | Archivo | Responsabilidad | Regla |
 | --- | --- | --- |
-| `src/api.ts` | Tipos del backend, cliente HTTP, adaptadores al modelo de UI | **Único lugar con `fetch`.** Ningún componente llama a la red. |
+| `src/api.ts` | Tipos del backend, cliente HTTP, adaptadores al modelo de UI, permisos por rol (`puede`) | **Único lugar con `fetch`.** Ningún componente llama a `fetch`. |
 | `src/data.ts` | Modelo de la UI (`TrafficEvent`, `EventState`, `Page`), menús, constantes | Sin lógica de red ni de estado. |
-| `src/App.tsx` | Todo el estado de la aplicación, sondeo cada 5 s, acciones (`commit`, `reset`) | Las páginas reciben `Ctx`; no crean estado global propio. |
-| `src/pages.tsx` | Una función por página del panel | Leen `c.events`, `c.detail`; actúan solo mediante funciones de `Ctx`. |
+| `src/App.tsx` | Estado global: sesión, eventos, sondeo cada 5 s, acciones (`commit`, `reset`), protección de páginas | Las páginas reciben `Ctx`; no crean estado global propio. |
+| `src/pages.tsx` | Páginas del panel que trabajan con eventos | Leen `c.events`, `c.detail`; actúan solo mediante funciones de `Ctx`. |
+| `src/login.tsx` · `src/cuenta.tsx` | Pantalla de acceso; cambio de contraseña (obligatorio o desde el perfil) | Nunca guardan credenciales: solo las envían a `api.ingresar` / `api.cambiarContrasena`. |
+| `src/google.ts` | Carga de Google Identity Services (implementación futura) | Único lugar que toca `window.google`. Solo se usa si el backend tiene `GOOGLE_CLIENT_ID`. |
+| `src/usuarios.tsx` | Administración de cuentas (solo ADMINISTRADOR) | Página con datos propios: llama a funciones de `api.ts`, nunca a `fetch`. |
 | `src/components.tsx` | Componentes visuales reutilizables | Presentacionales: sin red, sin estado de negocio. |
 | `src/landing.tsx` + `landing.css` | Landing pública | Ver "Privacidad". |
 | `src/hooks.ts` | Hooks genéricos | Sin conocimiento del dominio. |
 
 La navegación es un estado `Page` en `App.tsx`, no un router. Para una página nueva: agrega el valor a `Page`
-(`data.ts`), la entrada en `menus` si va en la barra lateral, la función en `pages.tsx` y su línea en `views`.
+(`data.ts`), la entrada en `menus` si va en la barra lateral, su regla en `permitida()` (qué roles la ven), la
+función en `pages.tsx` (o su propio archivo si tiene datos propios) y su línea en `views`.
+
+## Sesión y roles
+
+- **Personas:** inician sesión con correo y contraseña (`api.ingresar`); el backend entrega una cookie
+  `HttpOnly` + `SameSite=Strict`. **El frontend nunca ve, guarda ni envía tokens** y nunca guarda contraseñas
+  (ni en `localStorage` ni en estado que sobreviva al formulario): el navegador manda la cookie solo.
+- **Contraseña temporal:** si `Sesion.debe_cambiar` es `true`, `App.tsx` solo muestra `CambioContrasena`
+  (el backend responde 403 a todo lo demás). No agregues pantallas que se salten esa comprobación.
+- **Google:** implementación futura. El botón es ilustrativo ("Próximamente") salvo que `/api/auth/config`
+  devuelva un `google_client_id`; no lo quites ni lo presentes como funcional.
+- **Identidad:** quién firma un dictamen lo decide el backend desde la sesión. Nunca envíes `revisor_id`,
+  `operador_id` ni un "actor" en el cuerpo o en encabezados.
+- **401 = sesión terminada** (vencida, cerrada o permisos cambiados): `pedir` llama a `onSesionExpirada`, que
+  borra los datos de memoria y vuelve al acceso. No lo manejes caso por caso; solo evita mostrar un toast extra.
+  Excepción: en `api.ingresar` un 401 es "credenciales incorrectas", por eso va con `silencioso: true`.
+- **Sondeo:** las consultas automáticas usan `{ sondeo: true }` (`X-Argos-Sondeo: 1`) para no mantener viva una
+  sesión inactiva. Una acción del usuario nunca lleva esa marca.
+- **Roles en la UI:** `puede.*` y `permitida()` solo ocultan lo que el rol no puede usar. La autorización real
+  la aplica el backend (403); nunca confíes solo en ocultar un botón.
+
+| Rol | Ve | Puede |
+| --- | --- | --- |
+| `REVISOR` | Panel, eventos, evidencias, reportes | Emitir dictámenes |
+| `OPERADOR` | Panel, eventos, evidencias, reportes, dispositivos, configuración | Solo lectura de eventos |
+| `ADMINISTRADOR` | Todo | Dictámenes y administración de cuentas |
 
 ## Contrato con el backend
 
@@ -73,9 +103,12 @@ El backend es la **fuente de verdad**. El frontend adapta, no reinterpreta.
 - **La landing es pública:** no muestra eventos, placas, fotos ni conteos reales. Solo contenido estático.
 - No registres placas, rutas de evidencias ni datos de usuarios en `console.*`.
 - Sin peticiones a terceros: nada de analítica, CDNs ni APIs externas. El sistema debe funcionar en una laptop
-  de campo sin internet. (Excepción heredada: Google Fonts en `index.css`; ver "Deuda conocida".)
-- El revisor activo hoy es el primer usuario `REVISOR` de `/api/usuarios`, como sustituto del login real.
-  No construyas permisos encima de eso: llegará la autenticación.
+  de campo sin internet. **Única excepción permitida (futura):** el script de Google Identity Services
+  (`accounts.google.com/gsi/client`), cargado desde `google.ts` solo en la pantalla de acceso y solo si el
+  backend tiene `GOOGLE_CLIENT_ID`. Sin él, el panel no hace ninguna petición externa para el acceso. (Excepción
+  heredada aún pendiente: Google Fonts en `index.css`; ver "Deuda conocida".)
+- Al cerrar o perder la sesión se borran de memoria los eventos y el detalle (`olvidarDatos`). No dejes datos de
+  eventos en estado que sobreviva a la sesión.
 
 ## Honestidad del contenido
 
@@ -136,6 +169,7 @@ sistema no hace**.
 - [ ] Probado contra el backend real con eventos del simulador (no solo compilado).
 - [ ] Revisado a 1440 px y a 390 px de ancho.
 - [ ] Estados vacío, cargando y sin conexión funcionan (detén el backend y mira la UI).
+- [ ] Probado con cada rol que puede ver la pantalla; un rol sin permiso no ve la opción (y el backend da 403).
 - [ ] Sin datos reales en la landing ni en `localStorage`; sin `console.log` olvidados.
 - [ ] CHANGELOG actualizado si el cambio es visible.
 - [ ] Si cambió el contrato con el backend, ambos lados están en el mismo PR.
@@ -157,7 +191,6 @@ a datos reales o elimínalo:
 - Dispositivos: toda la página (IP, firmware, latencias y uptime de ejemplo).
 - Configuración: valores de calibración fijos, "Certificado INACAL", "12.8 GB", "Cifrado AES-256" (no existe
   cifrado en reposo).
-- Login: campos de solo lectura, "Token criptográfico RSA-4096" (no hay autenticación todavía).
 - Monitor y tablas: "YOLOv8", "CAM-01", "30 FPS", "1080p" fijos en el código.
 - `index.css` importa Google Fonts: sin internet cae a la fuente del sistema. Debe servirse localmente.
 - `public/forest-bg.jpg` ya no se usa.

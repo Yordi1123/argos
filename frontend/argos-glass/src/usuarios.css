@@ -1,0 +1,37 @@
+/* Administración de usuarios — reutiliza .glass-table, .glass-btn, .badge-pill de index.css */
+
+.usr-form { display: grid; gap: 14px; margin-top: 18px; }
+.usr-form label { display: grid; gap: 6px; font-size: 13px; font-weight: 600; color: var(--text-sub); }
+.usr-form input, .usr-form select,
+.glass-table select {
+  width: 100%; padding: 11px 14px; border-radius: 14px; font-size: 14px;
+  background: var(--input-glass-bg); color: var(--text-main);
+  border: 1px solid var(--card-border); outline: none;
+  transition: border-color 0.2s ease, box-shadow 0.2s ease;
+}
+.glass-table select { width: auto; padding: 7px 10px; font-size: 13px; border-radius: 10px; }
+.usr-form input:focus, .usr-form select:focus, .glass-table select:focus {
+  border-color: rgba(var(--accent-rgb), 0.7);
+  box-shadow: 0 0 0 3px rgba(var(--accent-rgb), 0.18);
+}
+.usr-form select option, .glass-table select option { background: #0b1324; color: #fff; }
+.usr-form .primary-glass-btn { justify-self: start; margin-top: 4px; }
+.usr-form .primary-glass-btn:disabled, .glass-table select:disabled { opacity: 0.55; cursor: not-allowed; }
+
+.usr-note { margin-top: 16px; font-size: 13px; line-height: 1.55; }
+.usr-email { display: block; color: var(--text-muted); margin-top: 2px; }
+.usr-tu { margin-left: 8px; font-size: 10.5px; padding: 2px 8px; }
+.usr-inactivo td { opacity: 0.55; }
+
+.usr-acciones { text-align: right; white-space: nowrap; }
+.usr-acciones .glass-btn + .glass-btn { margin-left: 8px; }
+
+.usr-clave-modal h2 { margin: 12px 0 6px; font-size: 21px; }
+.usr-credencial {
+  display: grid; grid-template-columns: auto 1fr; gap: 10px 16px; align-items: center;
+  margin: 18px 0 4px; padding: 16px; border-radius: 14px; background: var(--pill-bg); border: 1px solid var(--divider);
+}
+.usr-credencial dt { font-size: 12px; font-weight: 700; color: var(--text-muted); }
+.usr-credencial dd { font-size: 14px; font-weight: 600; word-break: break-all; }
+.usr-clave { font-family: var(--mono); font-size: 18px !important; letter-spacing: 1px; user-select: all; }
+.usr-modal-acciones { display: flex; justify-content: flex-end; gap: 10px; margin-top: 20px; }

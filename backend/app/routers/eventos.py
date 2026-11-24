@@ -1,10 +1,12 @@
 import hashlib
 import re
 from pathlib import Path
+from uuid import UUID
 
-from fastapi import APIRouter, Header, HTTPException, Query, Response
+from fastapi import APIRouter, Depends, HTTPException, Query, Response
 from fastapi.responses import FileResponse
 
+from ..auth import ADMIN, OPERADOR, REVISOR, ROLES_PERSONAS, VISION, Actor, requiere
 from ..config import config
 from ..db import auditar, pool, transaccion
 from ..esquemas import EventoCreado, EventoNuevo, ResultadoAnalisis, RevisionNueva
@@ -37,7 +39,7 @@ def _sha256(ruta: Path) -> str:
 
 @router.post("/eventos", status_code=201, response_model=EventoCreado)
 def registrar_evento(datos: EventoNuevo, response: Response,
-                     x_actor: str = Header(default="agente")):
+                     actor: Actor = Depends(requiere(OPERADOR, tipo="servicio"))):
     """El agente ya aplicó D1 y guardó la foto. Aquí se valida y se encola."""
     if datos.id is not None:
         with pool.connection() as conn:
@@ -91,7 +93,7 @@ def registrar_evento(datos: EventoNuevo, response: Response,
                    VALUES (%s, %s, %s, %s, %s)""",
                 (eid, ev.tipo, ev.ruta, ev.sha256, ev.capturada_en),
             )
-        auditar(conn, eid, "EVENTO_REGISTRADO", x_actor, None, "EVIDENCIA_GUARDADA",
+        auditar(conn, eid, "EVENTO_REGISTRADO", actor.etiqueta, None, "EVIDENCIA_GUARDADA",
                 {"velocidad_kmh": velocidad, "umbral_kmh": umbral})
 
         if motivo:
@@ -99,7 +101,7 @@ def registrar_evento(datos: EventoNuevo, response: Response,
             estado = "INCIERTO"
         else:
             estado = "EN_COLA"
-        cambiar_estado(conn, eid, estado, x_actor, {"motivo": motivo} if motivo else None)
+        cambiar_estado(conn, eid, estado, actor.etiqueta, {"motivo": motivo} if motivo else None)
 
     return EventoCreado(id=eid, velocidad_kmh=velocidad, estado=estado)
 
@@ -107,7 +109,8 @@ def registrar_evento(datos: EventoNuevo, response: Response,
 # ---------------------------------------------------------------- análisis (visión)
 
 @router.get("/cola")
-def siguiente_en_cola(limite: int = Query(5, ge=1, le=50)):
+def siguiente_en_cola(limite: int = Query(5, ge=1, le=50),
+                      _: Actor = Depends(requiere(VISION, tipo="servicio"))):
     with pool.connection() as conn:
         return conn.execute(
             """SELECT e.id, e.velocidad_kmh, ev.id AS evidencia_id, ev.ruta
@@ -122,8 +125,8 @@ def siguiente_en_cola(limite: int = Query(5, ge=1, le=50)):
 
 
 @router.post("/eventos/{evento_id}/analisis")
-def registrar_analisis(evento_id: str, datos: ResultadoAnalisis,
-                       x_actor: str = Header(default="vision")):
+def registrar_analisis(evento_id: UUID, datos: ResultadoAnalisis,
+                       actor: Actor = Depends(requiere(VISION, tipo="servicio"))):
     with transaccion() as conn:
         evento = conn.execute(
             """SELECT e.estado, e.velocidad_kmh, s.limite_kmh
@@ -161,21 +164,21 @@ def registrar_analisis(evento_id: str, datos: ResultadoAnalisis,
         )
 
         if datos.error:
-            auditar(conn, evento_id, "ANALISIS_FALLIDO", x_actor,
+            auditar(conn, evento_id, "ANALISIS_FALLIDO", actor.etiqueta,
                     detalle={"intento": intento, "error": datos.error})
             if intento >= MAX_INTENTOS_ANALISIS:
                 conn.execute(
                     "UPDATE eventos SET motivo_incierto = %s WHERE id = %s",
                     (f"Análisis falló {intento} veces", evento_id),
                 )
-                cambiar_estado(conn, evento_id, "INCIERTO", x_actor)
+                cambiar_estado(conn, evento_id, "INCIERTO", actor.etiqueta)
                 return {"estado": "INCIERTO", "intento": intento}
             return {"estado": "EN_COLA", "intento": intento}
 
-        cambiar_estado(conn, evento_id, "ANALIZADO", x_actor,
+        cambiar_estado(conn, evento_id, "ANALIZADO", actor.etiqueta,
                        {"placa": placa, "confianza": datos.confianza})
         # La decisión final siempre es humana: D2 solo prioriza la revisión
-        cambiar_estado(conn, evento_id, "EN_REVISION", x_actor, {"puntaje": puntaje})
+        cambiar_estado(conn, evento_id, "EN_REVISION", actor.etiqueta, {"puntaje": puntaje})
     return {"estado": "EN_REVISION", "intento": intento, "puntaje_utilidad": puntaje}
 
 
@@ -189,25 +192,20 @@ DECISION_A_ESTADO = {
 
 
 @router.post("/eventos/{evento_id}/revision")
-def revisar_evento(evento_id: str, datos: RevisionNueva):
+def revisar_evento(evento_id: UUID, datos: RevisionNueva,
+                   revisor: Actor = Depends(requiere(REVISOR, ADMIN, tipo="usuario"))):
+    """El revisor es quien tiene la sesión abierta: nunca se toma del cuerpo de la petición."""
+    placa = datos.placa_final.strip().upper() if datos.placa_final else None
+    nuevo = DECISION_A_ESTADO[datos.decision]
     with transaccion() as conn:
-        revisor = conn.execute(
-            "SELECT email, rol, activo FROM usuarios WHERE id = %s", (datos.revisor_id,)
-        ).fetchone()
-        if revisor is None or not revisor["activo"]:
-            raise HTTPException(403, "Usuario no válido")
-        if revisor["rol"] not in ("REVISOR", "ADMINISTRADOR"):
-            raise HTTPException(403, "Solo un revisor puede decidir sobre un evento")
-
-        placa = datos.placa_final.strip().upper() if datos.placa_final else None
+        # Primero la transición (404 si no existe, 409 si no está en revisión); luego el dictamen
+        cambiar_estado(conn, evento_id, nuevo, revisor.etiqueta,
+                       {"placa_final": placa, "comentario": datos.comentario})
         conn.execute(
             """INSERT INTO revisiones (evento_id, revisor_id, decision, placa_final, comentario)
                VALUES (%s, %s, %s, %s, %s)""",
-            (evento_id, datos.revisor_id, datos.decision, placa, datos.comentario),
+            (evento_id, revisor.id, datos.decision, placa, datos.comentario),
         )
-        nuevo = DECISION_A_ESTADO[datos.decision]
-        cambiar_estado(conn, evento_id, nuevo, revisor["email"],
-                       {"placa_final": placa, "comentario": datos.comentario})
     return {"estado": nuevo}
 
 
@@ -219,6 +217,7 @@ def listar_eventos(
     sesion_id: int | None = None,
     limite: int = Query(50, ge=1, le=500),
     desplazamiento: int = Query(0, ge=0),
+    _: Actor = Depends(requiere(*ROLES_PERSONAS, tipo="usuario")),
 ):
     with pool.connection() as conn:
         return conn.execute(
@@ -241,7 +240,7 @@ def listar_eventos(
 
 
 @router.get("/eventos/{evento_id}")
-def detalle_evento(evento_id: str):
+def detalle_evento(evento_id: UUID, _: Actor = Depends(requiere(*ROLES_PERSONAS, tipo="usuario"))):
     with pool.connection() as conn:
         evento = conn.execute(
             """SELECT e.*, s.ubicacion, s.distancia_m, s.limite_kmh, s.incertidumbre_kmh
@@ -261,7 +260,7 @@ def detalle_evento(evento_id: str):
 
 
 @router.get("/evidencias/{evidencia_id}/archivo")
-def descargar_evidencia(evidencia_id: int):
+def descargar_evidencia(evidencia_id: int, _: Actor = Depends(requiere(*ROLES_PERSONAS, tipo="usuario"))):
     with pool.connection() as conn:
         ev = conn.execute(
             "SELECT ruta, sha256 FROM evidencias WHERE id = %s", (evidencia_id,)

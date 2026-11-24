@@ -1,4 +1,4 @@
-import type { Estado } from './api';
+import { puede, type Estado, type Rol } from './api';
 
 /** Estado visible en la interfaz (derivado del estado del backend en api.ts). */
 export type EventState = 'Pendiente' | 'Validado' | 'Descartado' | 'No verificable' | 'En análisis';
@@ -47,6 +47,19 @@ export const menus: [Page, string][] = [
   ['settings', 'Configuración'],
   ['users', 'Administración de usuarios'],
 ];
+
+/** Páginas públicas: no requieren sesión. */
+export const PUBLICAS: Page[] = ['landing', 'login'];
+
+/** Qué páginas del panel ve cada rol (la autorización real la aplica el backend). */
+export function permitida(p: Page, rol?: Rol): boolean {
+  if (PUBLICAS.includes(p)) return true;
+  if (!rol) return false;
+  if (p === 'review') return puede.revisar(rol);
+  if (p === 'users') return puede.administrar(rol);
+  if (p === 'device' || p === 'settings') return puede.operar(rol);
+  return true; // dash, monitor, events, image, reports, detail: cualquier rol con sesión
+}
 
 /** Vehículo ilustrativo para la pantalla de acceso (no muestra evidencia real antes de ingresar). */
 export const DEMO_EVENT: TrafficEvent = {

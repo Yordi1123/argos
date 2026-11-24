@@ -8,7 +8,27 @@ export type Estado =
 
 export type Decision = 'CONFIRMAR' | 'DESCARTAR' | 'MARCAR_INCIERTO';
 
-export interface Usuario { id: number; nombre: string; email: string; rol: string }
+export type Rol = 'ADMINISTRADOR' | 'REVISOR' | 'OPERADOR';
+
+/** Persona con sesión abierta (GET /api/auth/yo). */
+export interface Sesion {
+  tipo: 'usuario'; id: number; nombre: string; email: string; rol: Rol;
+  /** Tiene contraseña temporal: el backend responde 403 a todo salvo cambiarla o salir. */
+  debe_cambiar: boolean;
+}
+
+/** Cuenta que puede entrar al panel (GET /api/usuarios, solo ADMINISTRADOR). */
+export interface Usuario {
+  id: number; nombre: string; email: string; rol: Rol; activo: boolean;
+  ultimo_acceso: string | null; creado_en: string;
+  tiene_contrasena: boolean;
+  debe_cambiar_contrasena: boolean;
+  /** Bloqueada temporalmente por intentos fallidos. */
+  bloqueado: boolean;
+}
+
+/** Respuesta al crear una cuenta o restablecer su contraseña: la temporal llega solo esta vez. */
+export type UsuarioConClave = Usuario & { contrasena_temporal: string };
 
 /** Postgres NUMERIC llega como string en el JSON. */
 type Num = string | number;
@@ -47,36 +67,98 @@ export interface EventoDetalle {
   evidencias: Evidencia[]; analisis: Analisis[]; revisiones: Revision[]; auditoria: Auditoria[];
 }
 
-/* ---------- Cliente HTTP (mismo origen: nginx o el proxy de Vite reenvían /api) ---------- */
+/* ---------- Cliente HTTP (mismo origen: nginx o el proxy de Vite reenvían /api) ----------
+ * La sesión viaja en una cookie HttpOnly que el navegador envía sola: el código nunca ve el token.
+ */
 
-async function pedir<T>(url: string, opciones?: RequestInit): Promise<T> {
-  const r = await fetch(url, {
-    ...opciones,
-    headers: { 'Content-Type': 'application/json', ...opciones?.headers },
-  });
-  if (!r.ok) {
-    const cuerpo = await r.json().catch(() => ({}));
-    const d = cuerpo.detail;
-    throw new Error(typeof d === 'string' ? d : Array.isArray(d) ? d.map((x) => x.msg).join('; ') : `Error ${r.status}`);
+export class ErrorApi extends Error {
+  readonly status: number;
+  constructor(status: number, mensaje: string) {
+    super(mensaje);
+    this.status = status;
   }
-  return r.json();
 }
 
+let alExpirar: (() => void) | null = null;
+/** App.tsx registra aquí qué hacer cuando el backend responde 401 (sesión vencida o cerrada). */
+export function onSesionExpirada(fn: () => void) { alExpirar = fn; }
+
+interface Opciones extends RequestInit {
+  /** Consulta automática (sondeo): no cuenta como actividad del usuario para el cierre por inactividad. */
+  sondeo?: boolean;
+  /** No disparar onSesionExpirada en un 401 (p. ej. al comprobar si hay sesión al abrir el panel). */
+  silencioso?: boolean;
+}
+
+async function pedir<T>(url: string, { sondeo, silencioso, ...opciones }: Opciones = {}): Promise<T> {
+  const r = await fetch(url, {
+    ...opciones,
+    credentials: 'same-origin',
+    headers: {
+      'Content-Type': 'application/json',
+      ...(sondeo ? { 'X-Argos-Sondeo': '1' } : {}),
+      ...opciones.headers,
+    },
+  });
+  if (!r.ok) {
+    if (r.status === 401 && !silencioso) alExpirar?.();
+    const cuerpo = await r.json().catch(() => ({}));
+    const d = cuerpo.detail;
+    throw new ErrorApi(r.status,
+      typeof d === 'string' ? d : Array.isArray(d) ? d.map((x) => x.msg).join('; ') : `Error ${r.status}`);
+  }
+  return r.status === 204 ? (undefined as T) : r.json();
+}
+
+const json = (method: string, cuerpo: unknown): RequestInit => ({ method, body: JSON.stringify(cuerpo) });
+
 export const api = {
+  // Autenticación
+  authConfig: () => pedir<{ google_client_id: string | null }>('/api/auth/config', { silencioso: true }),
+  yo: () => pedir<Sesion>('/api/auth/yo', { silencioso: true }),
+  /** 401 aquí significa credenciales incorrectas, no sesión vencida: silencioso. */
+  ingresar: (email: string, contrasena: string) =>
+    pedir<Sesion>('/api/auth/ingresar', { ...json('POST', { email, contrasena }), silencioso: true }),
+  cambiarContrasena: (actual: string, nueva: string) =>
+    pedir<void>('/api/auth/contrasena', json('POST', { actual, nueva })),
+  /** Implementación futura: el backend responde 503 mientras no haya GOOGLE_CLIENT_ID. */
+  entrarConGoogle: (credential: string) =>
+    pedir<Sesion>('/api/auth/google', { ...json('POST', { credential }), silencioso: true }),
+  salir: () => pedir<void>('/api/auth/salir', { method: 'POST', silencioso: true }),
+
+  // Administración de usuarios (solo ADMINISTRADOR)
   usuarios: () => pedir<Usuario[]>('/api/usuarios'),
-  eventos: (limite = 500) => pedir<EventoResumen[]>(`/api/eventos?limite=${limite}`),
+  crearUsuario: (email: string, rol: Rol, nombre: string) =>
+    pedir<UsuarioConClave>('/api/usuarios', json('POST', { email, rol, nombre: nombre.trim() })),
+  restablecerContrasena: (id: number) =>
+    pedir<UsuarioConClave>(`/api/usuarios/${id}/contrasena`, { method: 'POST' }),
+  modificarUsuario: (id: number, cambios: Partial<Pick<Usuario, 'nombre' | 'rol' | 'activo'>>) =>
+    pedir<Usuario>(`/api/usuarios/${id}`, json('PATCH', cambios)),
+
+  // Eventos
+  eventos: (limite = 500, sondeo = false) => pedir<EventoResumen[]>(`/api/eventos?limite=${limite}`, { sondeo }),
   evento: (id: string) => pedir<EventoDetalle>(`/api/eventos/${id}`),
-  revisar: (id: string, revisorId: number, decision: Decision, placaFinal: string | null, comentario: string) =>
-    pedir<{ estado: Estado }>(`/api/eventos/${id}/revision`, {
-      method: 'POST',
-      body: JSON.stringify({
-        revisor_id: revisorId,
-        decision,
-        placa_final: placaFinal || null,
-        comentario: comentario || null,
-      }),
-    }),
+  /** El revisor no se envía: el backend lo toma de la sesión. */
+  revisar: (id: string, decision: Decision, placaFinal: string | null, comentario: string) =>
+    pedir<{ estado: Estado }>(`/api/eventos/${id}/revision`, json('POST', {
+      decision,
+      placa_final: placaFinal || null,
+      comentario: comentario || null,
+    })),
   urlEvidencia: (id: number) => `/api/evidencias/${id}/archivo`,
+};
+
+/** Qué puede hacer cada rol en el panel. La autorización real la aplica el backend; esto solo adapta la UI. */
+export const puede = {
+  revisar: (r?: Rol) => r === 'REVISOR' || r === 'ADMINISTRADOR',
+  administrar: (r?: Rol) => r === 'ADMINISTRADOR',
+  operar: (r?: Rol) => r === 'OPERADOR' || r === 'ADMINISTRADOR',
+};
+
+export const ROL_UI: Record<Rol, string> = {
+  ADMINISTRADOR: 'Administrador',
+  REVISOR: 'Revisor vial',
+  OPERADOR: 'Operador de campo',
 };
 
 /* ---------- Adaptación al modelo de la interfaz ---------- */

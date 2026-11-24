@@ -9,6 +9,10 @@ Reproduce lo que hará el agente real con el ESP32 y la cámara:
 
 También puede simular el módulo de visión (--analizar) para probar el panel.
 
+Autenticación: cada servicio envía su clave en `X-Api-Key`. Se leen de las variables de entorno
+ARGOS_CLAVE_AGENTE (rol OPERADOR) y ARGOS_CLAVE_VISION (rol VALIDACION_IA), o del .env de la raíz.
+Se generan con:  docker compose exec backend python -m app.claves crear agente OPERADOR
+
 Uso:
   python agente/simulador.py --eventos 8 --analizar
   python agente/simulador.py --reenviar
@@ -16,6 +20,7 @@ Uso:
 import argparse
 import hashlib
 import json
+import os
 import random
 import struct
 import urllib.error
@@ -26,14 +31,33 @@ from datetime import datetime, timezone
 from pathlib import Path
 
 RAIZ = Path(__file__).resolve().parent.parent / "data" / "evidencias"
+ENV = Path(__file__).resolve().parent.parent / ".env"
 DISTANCIA_M = 3.0
 
 
-def llamar(api, metodo, ruta, cuerpo=None, actor="agente"):
+def clave(servicio):
+    """Clave de API del servicio ('agente' o 'vision'): variable de entorno o .env de la raíz."""
+    variable = f"ARGOS_CLAVE_{servicio.upper()}"
+    valor = os.environ.get(variable)
+    if not valor and ENV.is_file():
+        for linea in ENV.read_text().splitlines():
+            nombre, _, v = linea.partition("=")
+            if nombre.strip() == variable:
+                valor = v.strip().strip('"').strip("'")
+    if not valor:
+        raise SystemExit(
+            f"✗ Falta {variable}. Créala con:\n"
+            f"  docker compose exec backend python -m app.claves crear {servicio} "
+            f"{'OPERADOR' if servicio == 'agente' else 'VALIDACION_IA'}\n"
+            f"y guárdala en .env")
+    return valor
+
+
+def llamar(api, metodo, ruta, cuerpo=None, servicio="agente"):
     datos = json.dumps(cuerpo).encode() if cuerpo is not None else None
     req = urllib.request.Request(
         api + ruta, data=datos, method=metodo,
-        headers={"Content-Type": "application/json", "X-Actor": actor},
+        headers={"Content-Type": "application/json", "X-Api-Key": clave(servicio)},
     )
     with urllib.request.urlopen(req, timeout=10) as r:
         return json.loads(r.read())
@@ -106,7 +130,7 @@ def capturar(api, sesion, limite, incertidumbre):
 
 def analizar(api):
     """Simula el módulo de visión: toma la cola y propone placas."""
-    for ev in llamar(api, "GET", "/api/cola?limite=50"):
+    for ev in llamar(api, "GET", "/api/cola?limite=50", servicio="vision"):
         if random.random() < 0.15:
             r = llamar(api, "POST", f"/api/eventos/{ev['id']}/analisis",
                        {"error": "Sin placa detectada", "modelo_version": "simulador"}, "vision")
@@ -146,7 +170,7 @@ def main():
             "ubicacion": "Av. Pacífico, UPIS Belén (simulación)",
             "distancia_m": DISTANCIA_M, "limite_kmh": 40, "incertidumbre_kmh": 1.0,
             "latencia_camara_ms": 120,
-        }, "operador@argos.local")
+        })
         print(f"Sesión {sesion['id']} creada")
 
     print(f"Capturando {a.eventos} evento(s)")

@@ -1,6 +1,6 @@
 import { useMemo, useState } from 'react';
-import { DEMO_EVENT, LIMIT, STATES, type EventState, type Page, type TrafficEvent } from './data';
-import { REVISABLES, type Auditoria, type EventoDetalle, type Usuario } from './api';
+import { LIMIT, STATES, type EventState, type Page, type TrafficEvent } from './data';
+import { puede, REVISABLES, type Auditoria, type EventoDetalle, type Sesion } from './api';
 import { AuditTimeline, Badge, Bars, Camera, EventTable, Gauge, Glass, Heading, Icon, ModernAreaChart, PlateTag, Road, Sparkline, TrendPill } from './components';
 
 export interface Ctx {
@@ -10,7 +10,8 @@ export interface Ctx {
   detail: EventoDetalle | null;
   loaded: boolean;
   online: boolean;
-  reviewer: Usuario | null;
+  /** Persona con la sesión abierta. Las páginas del panel solo se muestran con sesión. */
+  user: Sesion;
   go: (p: Page) => void;
   open: (id: string) => void;
   toast: (t: string) => void;
@@ -547,6 +548,7 @@ export function Detail({ c, review }: { c: Ctx; review: boolean }) {
   const dt = d ? (d.t2_us - d.t1_us) / 1_000_000 : null;
   const ultimo = d?.analisis.filter((a) => !a.error).at(-1);
   const canReview = REVISABLES.includes(e.estado);
+  const esRevisor = puede.revisar(c.user.rol);
 
   // Desglose de confianza de caracteres para la inspección forense
   const chars = e.plate.split('');
@@ -715,7 +717,7 @@ export function Detail({ c, review }: { c: Ctx; review: boolean }) {
                   )}
                 </div>
               </>
-            ) : (
+            ) : esRevisor && canReview ? (
               <button
                 id="btn-review"
                 className="primary-glass-btn block"
@@ -724,7 +726,7 @@ export function Detail({ c, review }: { c: Ctx; review: boolean }) {
               >
                 Abrir Estación de Revisión Pericial →
               </button>
-            )}
+            ) : null}
           </Glass>
 
           <Glass style={{ marginTop: 20 }}>
@@ -757,7 +759,7 @@ export function Detail({ c, review }: { c: Ctx; review: boolean }) {
             <div className="eyebrow-tag">DICTAMEN PERICIAL</div>
             <h1 style={{ fontSize: 24, margin: '8px 0' }}>{modal} lectura</h1>
             <p className="muted">
-              Se registrará tu dictamen en el expediente digital de {e.shortId} a nombre de <b>{c.reviewer?.nombre ?? '—'}</b>. Esta acción queda en la auditoría y no se puede deshacer.
+              Se registrará tu dictamen en el expediente digital de {e.shortId} a nombre de <b>{c.user.nombre}</b>. Esta acción queda en la auditoría y no se puede deshacer.
             </p>
             {modal === 'Corregir' && (
               <label>
@@ -1109,145 +1111,5 @@ export function Settings({ c }: { c: Ctx }) {
         </div>
       )}
     </>
-  );
-}
-
-/* ---------------- Usuarios ---------------- */
-export function Users({ c }: { c: Ctx }) {
-  const audit = c.events.flatMap((e) => e.history);
-  return (
-    <>
-      <Heading title="Administración de Accesos" sub="Usuarios con credenciales periciales y trazabilidad legal." />
-      <Glass>
-        <h2>Matriz de Roles y Facultades</h2>
-        <div className="table-responsive">
-          <table className="glass-table">
-            <thead>
-              <tr><th>Rol</th><th>Responsabilidad</th><th>Acceso</th></tr>
-            </thead>
-            <tbody>
-              {[
-                ['Perito Revisor', 'Inspección de evidencias y firma de actas', 'Revisión y firma'],
-                ['Operador Vial', 'Supervisión de tráfico y telemetría', 'Monitoreo en vivo'],
-                ['Administrador Metrológico', 'Calibración física y parámetros de red', 'Control total'],
-              ].map((r) => (
-                <tr key={r[0]}>
-                  <td><b>{r[0]}</b></td>
-                  <td>{r[1]}</td>
-                  <td><span className="tag-pill">{r[2]}</span></td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-      </Glass>
-
-      <div className="v5-analytics-grid equal" style={{ marginTop: 20 }}>
-        <Glass>
-          <h2>Sesión Pericial Activa</h2>
-          <div className="audit-item"><b>{c.reviewer ? `${c.reviewer.nombre} · ${c.reviewer.email}` : 'Sin revisor activo'}</b> &nbsp; <span className="badge-pill valid"><span className="b-dot" />{c.reviewer?.rol ?? '—'}</span></div>
-          <p className="muted">Usuario de demostración: se reemplazará por inicio de sesión real.</p>
-        </Glass>
-        <Glass>
-          <h2>Bitácora de Firmas</h2>
-          {audit.length ? (
-            audit.map((h, i) => <div key={i} className="audit-item">{h}</div>)
-          ) : (
-            <div className="empty-cell">Las decisiones aparecerán aquí al revisar placas.</div>
-          )}
-        </Glass>
-      </div>
-    </>
-  );
-}
-
-/* ---------------- Login ---------------- */
-export function Login({ c }: { c: Ctx }) {
-  return (
-    <div className="v5-login-layout">
-      <button className="glass-btn sm login-back-btn" onClick={() => c.go('landing')}>
-        ← Volver al inicio
-      </button>
-      <div className="login-visual-panel">
-        <div className="login-brand-suite">
-          <div className="brand-badge-icon large">
-            <img src="/argos-symbol.png" alt="Logo ARGOS" className="brand-logo-img" />
-          </div>
-          <div>
-            <div className="login-brand-main">ARGOS</div>
-            <div className="login-brand-sub">SISTEMA INTELIGENTE DE VISIÓN VIAL</div>
-          </div>
-        </div>
-
-        <div className="eyebrow-tag" style={{ marginTop: 40 }}>
-          <span className="live-dot-pulse" /> PLATAFORMA PERICIAL HOMOLOGADA
-        </div>
-        <h1>Una mirada precisa.<br />Una ciudad más segura.</h1>
-        <p className="muted" style={{ maxWidth: 460 }}>
-          Supervisión de velocidad, captura sincronizada de fotogramas RAW y validación pericial de placas con tecnología Liquid Glass.
-        </p>
-        <div className="glass-card login-road-box">
-          <Road ev={DEMO_EVENT} />
-        </div>
-      </div>
-
-      <Glass className="v5-login-card">
-        <div className="login-card-header">
-          <span className="card-security-pill">
-            <span className="live-dot-pulse green" /> Acceso Pericial Seguro
-          </span>
-          <h1 className="login-card-title">Centro de Control</h1>
-          <p className="login-card-sub">
-            Plataforma pericial de fiscalización vial y captura cinemométrica.
-          </p>
-        </div>
-
-        <div className="login-fields-list">
-          <div className="login-input-group">
-            <label className="login-label">
-              <span className="login-label-icon"><Icon name="users" /></span>
-              <span>Correo Institucional</span>
-            </label>
-            <div className="login-glass-input-box">
-              <span className="login-affix-symbol">@</span>
-              <input
-                className="login-glass-input"
-                type="email"
-                defaultValue="perito@muninuevochimbote.gob.pe"
-                readOnly
-              />
-              <span className="login-verified-badge">✓ Verificado</span>
-            </div>
-          </div>
-
-          <div className="login-input-group">
-            <label className="login-label">
-              <span className="login-label-icon"><Icon name="shield" /></span>
-              <span>Token Criptográfico de Acceso</span>
-            </label>
-            <div className="login-glass-input-box">
-              <span className="login-affix-symbol">🔑</span>
-              <input
-                className="login-glass-input"
-                type="password"
-                defaultValue="••••••••••••••••"
-                readOnly
-              />
-              <span className="login-cipher-badge">RSA-4096</span>
-            </div>
-          </div>
-        </div>
-
-        <button id="btn-login" className="login-submit-btn" onClick={() => c.go('dash')}>
-          <span>Ingresar a la Plataforma ARGOS</span>
-          <span className="btn-arrow-icon"><Icon name="arrow" /></span>
-        </button>
-
-        <div className="login-footer-info">
-          <span className="security-icon-dot">🛡️</span>
-          <span>Nodo Local Seguro · Av. Pacífico · UPIS Belén</span>
-        </div>
-      </Glass>
-    </div>
   );
 }

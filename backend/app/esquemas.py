@@ -11,7 +11,6 @@ class SesionNueva(BaseModel):
     limite_kmh: float = Field(gt=0, le=150)
     incertidumbre_kmh: float = Field(default=1.0, ge=0, le=10)
     latencia_camara_ms: float | None = None
-    operador_id: int | None = None
 
 
 class EvidenciaEntrada(BaseModel):
@@ -51,7 +50,7 @@ class ResultadoAnalisis(BaseModel):
 
 
 class RevisionNueva(BaseModel):
-    revisor_id: int
+    """El revisor no viene aquí: se toma de la sesión (auth.requiere)."""
     decision: Literal["CONFIRMAR", "DESCARTAR", "MARCAR_INCIERTO"]
     placa_final: str | None = Field(default=None, max_length=10)
     comentario: str | None = Field(default=None, max_length=1000)

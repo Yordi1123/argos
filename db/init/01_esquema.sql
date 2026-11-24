@@ -112,8 +112,5 @@ CREATE TRIGGER trg_auditoria_inmutable
   BEFORE UPDATE OR DELETE ON auditoria
   FOR EACH ROW EXECUTE FUNCTION auditoria_inmutable();
 
--- Usuarios de demostración (reemplazar antes del piloto)
-INSERT INTO usuarios (nombre, email, rol) VALUES
-  ('Administrador ARGOS', 'admin@argos.local',    'ADMINISTRADOR'),
-  ('Revisor demo',        'revisor@argos.local',  'REVISOR'),
-  ('Operador demo',       'operador@argos.local', 'OPERADOR');
+-- Sin usuarios iniciales: el primer administrador se crea al arrancar el backend
+-- a partir de ARGOS_ADMIN_EMAIL (.env). Ver 02_autenticacion.sql.
